@@ -1,0 +1,7 @@
+*.mex*
+*.pyc
+*.tgz
+*.so
+*.o
+*.obj
+*.mtl

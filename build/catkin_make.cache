@@ -1,0 +1,2 @@
+lab0
+-DCATKIN_DEVEL_PREFIX=/home/robots/490R_Projects/devel -DCMAKE_INSTALL_PREFIX=/home/robots/490R_Projects/install -G Unix Makefiles
