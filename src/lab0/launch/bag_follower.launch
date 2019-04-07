@@ -1,6 +1,5 @@
 <launch>
-
-    <arg name="bag_file" default="$(find lab0)/bags/test_2019-04-05-16-16-23.bag" />
+    <arg name="bag_file" default="$(find lab0)/bags/figure8.bag" />
 
     <node pkg="lab0" name="bag_follower" type="bag_follower.py" output='screen'>
     	<param name="bag_file" value="$(arg bag_file)" />
