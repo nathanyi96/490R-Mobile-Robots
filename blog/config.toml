@@ -1,12 +1,12 @@
 baseurl = "https://cse490r.pages.cs.washington.edu/19sp/blogs/quiz"
 # Change this!
-title = "CSE490R Blog Template"
+title = "CSE 490R: Probabilistic Robotics Spring 2019"
 theme ="hugo-theme-basic"
 languageCode = "en-us"
 enableEmoji = true
 copyright = "© 2016-19 <a href='https://github.com/siegerts/hugo-theme-basic'>Hugo Theme Basic</a>. Made by <a href='https://twitter.com/siegerts'>@siegerts</a>."
 # Change this!
-description = "A blog to document our group's progress in CSE490R" 
+description = "Probabilistic robotics development documentation"
 
 [[params.menu]]
   name = "blog"
