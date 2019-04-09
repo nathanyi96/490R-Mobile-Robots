@@ -1,7 +1,7 @@
 +++
-author = "Colin Summers"
-date = 2019-03-31
-title = "Example Post"
+author = "???"
+date = 2019-04-10
+title = "Lab 0: Introduction"
 +++
 
 ## Assignment Description
