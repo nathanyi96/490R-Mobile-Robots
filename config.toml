@@ -1,0 +1,27 @@
+baseurl = "https://cse490r.pages.cs.washington.edu/19sp/blogs/quiz"
+# Change this!
+title = "CSE490R Blog Template"
+theme ="hugo-theme-basic"
+languageCode = "en-us"
+enableEmoji = true
+copyright = "© 2016-19 <a href='https://github.com/siegerts/hugo-theme-basic'>Hugo Theme Basic</a>. Made by <a href='https://twitter.com/siegerts'>@siegerts</a>."
+# Change this!
+description = "A blog to document our group's progress in CSE490R" 
+
+[[params.menu]]
+  name = "blog"
+  url = "post/"
+
+[[params.menu]]
+  name = "about"
+  url = "about/"
+
+[privacy]
+  [privacy.googleAnalytics]
+    anonymizeIP = true
+    respectDoNotTrack = true
+    useSessionStorage = true
+  [privacy.twitter]
+    enableDNT = true
+  [privacy.youtube]
+    privacyEnhanced = true
