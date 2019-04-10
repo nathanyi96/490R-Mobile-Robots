@@ -1,7 +1,11 @@
 <launch>
-    <arg name="bag_file" default="$(find lab0)/bags/figure8.bag" />
+	<include file="$(find lab0)/launch/map_server.launch" />
 
-    <node pkg="lab0" name="bag_follower" type="bag_follower.py" output='screen'>
-    	<param name="bag_file" value="$(arg bag_file)" />
-    </node>
+	<arg name="bag_file" default="$(find lab0)/bags/figure8.bag" />
+	<arg name="backward" default="false" />
+
+	<node pkg="lab0" name="bag_follower" type="bag_follower.py" output='screen'>
+		<param name="backward" value="$(arg backward)" />
+		<param name="bag_file" value="$(arg bag_file)" />
+	</node>
 </launch>

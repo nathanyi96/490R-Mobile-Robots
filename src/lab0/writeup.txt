@@ -1,0 +1,10 @@
+(a). 
+Real world recorded bag is more noisy.
+
+(b).
+?
+
+(c).
+4.1, we create a fig8 node that would drive the car in a "8" path which is modeled as two circles. The saved marker for one drawing is attached. We create a subscriber that listens to the current heading of the robot. We use this subscriber to detect if the car finishes one circle, after which we negate the steering angle and the car starts to draw another circle in other direction. Given any steering angle and velocity, the robot is able to run in a 8 path with fairly high accuracy.
+
+4.2 We create a safety controller that includes a subscriber for the laser scan and a publisher to the safety topic. Among all valid returned laser readings, we define a safety condition as more than 5 laser readings closer than 0.5m exist, and we publish a 0-velocity to stop the car. The reason why we create such threshold is that in simulation, the laser scan is noisy. 

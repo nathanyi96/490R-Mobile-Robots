@@ -1,0 +1,11 @@
+<launch>
+	<include file="$(find lab0)/launch/map_server.launch" />
+
+	<arg name="velocity" default="3" />
+	<arg name="steering_angle" default="0.1" />
+
+	<node pkg="lab0" name="fig8" type="fig8.py" output='screen'>
+		<param name="velocity" value="$(arg velocity)" />
+		<param name="steering_angle" value="$(arg steering_angle)" />
+	</node>
+</launch>

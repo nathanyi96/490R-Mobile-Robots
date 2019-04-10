@@ -1,4 +1,4 @@
 <launch>
-    <node pkg="lab0" name="marker" type="pose_marker.py" output='screen'>
+    <node pkg="lab0" name="marker" type="pose_markers.py" output='screen'>
     </node>
 </launch>

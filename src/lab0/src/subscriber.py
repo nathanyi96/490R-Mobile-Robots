@@ -27,7 +27,6 @@ class Subscriber:
         self.rate = rospy.Rate(20)
 
         while not rospy.is_shutdown():
-            # TODO: publish to VESC
             cmd = AckermannDriveStamped()
             cmd.header.stamp = rospy.Time.now()
             cmd.header.frame_id = "/map"
@@ -39,32 +38,25 @@ class Subscriber:
             self.rate.sleep()
 
     def init_callback(self, init):
-        def sub_init_pose():
-            rospy.loginfo("Receiving init pose: " + init.data)
-            # TODO: parse initial pose and publish to /initialpose
-            init_data = init.data.split(',')
-            init_msg = PoseWithCovarianceStamped()
-            init_msg.header.stamp = rospy.Time.now()
-            init_msg.header.frame_id = "/map"
-            init_msg.pose.pose.position.x = float(init_data[0])
-            init_msg.pose.pose.position.y = float(init_data[1])
-            init_msg.pose.pose.orientation = angle_to_quaternion(float(init_data[2]))
-            # init_msg.pose.covariance = # TODO: check if this line is needed
-            
-            self.pub_init.publish(init_msg)
-        return sub_init_pose()
+        rospy.loginfo("Receiving init pose: " + init.data)
+        init_data = init.data.split(',')
+        init_msg = PoseWithCovarianceStamped()
+        init_msg.header.stamp = rospy.Time.now()
+        init_msg.header.frame_id = "/map"
+        init_msg.pose.pose.position.x = float(init_data[0])
+        init_msg.pose.pose.position.y = float(init_data[1])
+        init_msg.pose.pose.orientation = angle_to_quaternion(float(init_data[2]))
+        # init_msg.pose.covariance = # TODO: check if this line is needed
+        
+        self.pub_init.publish(init_msg)
 
     def vel_callback(self, v):
-        def sub_vel():
-            rospy.loginfo("Receiving velocity: " + str(v.data))
-            self._velocity = v.data
-        return sub_vel()
+        rospy.loginfo("Receiving velocity: " + str(v.data))
+        self._velocity = v.data
 
     def heading_callback(self, h):
-        def sub_heading():
-            rospy.loginfo("Receiving heading: " + str(h.data))
-            self._heading = h.data
-        return sub_heading()
+        rospy.loginfo("Receiving heading: " + str(h.data))
+        self._heading = h.data
 
     def reset(self, req):
         rospy.loginfo('Reset velocity and heading to 0.')
