@@ -5,6 +5,10 @@ Real world recorded bag is more noisy.
 ?
 
 (c).
-4.1, we create a fig8 node that would drive the car in a "8" path which is modeled as two circles. The saved marker for one drawing is attached. We create a subscriber that listens to the current heading of the robot. We use this subscriber to detect if the car finishes one circle, after which we negate the steering angle and the car starts to draw another circle in other direction. Given any steering angle and velocity, the robot is able to run in a 8 path with fairly high accuracy.
+4.1
+We create a fig8 node that would drive the car in a "8" path which is modeled as two circles. The saved marker for one drawing is attached. We create a subscriber that listens to the current heading of the robot. We use this subscriber to detect if the car finishes one circle, after which we negate the steering angle and the car starts to draw another circle in other direction. Given any steering angle and velocity, the robot is able to run in a 8 path with fairly high accuracy. However, some problems include,
+	(1) the subcribed headings do not correspond well with the time they are received.
+	(2) from time to time the noises of car's heading from the visualization cause the program to intepret that the car has finished the circles.
+Alternatively, we implemented another approach that applies the the kinematic car's motion model to estimate the time peroid of running a circle. This approach does not involve the above issues but have less accurate circles with varying velocity and steering angle parameters. This node is written in the file fig8_time.py.
 
 4.2 We create a safety controller that includes a subscriber for the laser scan and a publisher to the safety topic. Among all valid returned laser readings, we define a safety condition as more than 5 laser readings closer than 0.5m exist, and we publish a 0-velocity to stop the car. The reason why we create such threshold is that in simulation, the laser scan is noisy. 

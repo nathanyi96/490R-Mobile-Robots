@@ -46,8 +46,6 @@ class Subscriber:
         init_msg.pose.pose.position.x = float(init_data[0])
         init_msg.pose.pose.position.y = float(init_data[1])
         init_msg.pose.pose.orientation = angle_to_quaternion(float(init_data[2]))
-        # init_msg.pose.covariance = # TODO: check if this line is needed
-        
         self.pub_init.publish(init_msg)
 
     def vel_callback(self, v):

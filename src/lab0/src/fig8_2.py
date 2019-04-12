@@ -9,33 +9,20 @@ import rosbag
 from geometry_msgs.msg import PoseStamped
 from utils import *
 
-
-heading_flag = 1
-velocity_flag = 1
-noise_eps = 0.01
-
-velocity = 0.0
-steering_angle = 0.0
-
-def circle_callback(pose):
-    global heading_flag, velocity_flag, steering_angle
-    heading = quaternion_to_angle(pose.pose.orientation)
-    thre = [steering_angle, steering_angle/5]
-    print heading
-    if heading_flag == 1 and heading > -thre[0] and heading < -thre[1]:
-        heading_flag = -1
-    if heading_flag == -1 and heading < thre[0] and heading > thre[1]:
-        velocity_flag = 0
-
 if __name__ == '__main__':
     rospy.init_node('fig8', anonymous=True)
 
-    velocity = rospy.get_param('~velocity')
-    steering_angle = rospy.get_param('~steering_angle')
+    tires_dist = 0.335 # meters
+    velocity = rospy.get_param('~velocity')  # meters/sec
+    steering_angle = rospy.get_param('~steering_angle')  # rad
+    max_sa = 0.34
+    if steering_angle > max_sa:
+        steering_angle = max_sa
+    if steering_angle < -max_sa:
+        steering_angle = -max_sa
 
     pub_nav0 = rospy.Publisher('/vesc/high_level/ackermann_cmd_mux/input/nav_0', AckermannDriveStamped, queue_size=1)
     pub_init = rospy.Publisher('/initialpose', PoseWithCovarianceStamped, queue_size=1)
-    sub_pose = rospy.Subscriber('sim_car_pose/pose', PoseStamped, circle_callback, queue_size=1)
 
     
 
@@ -54,22 +41,31 @@ if __name__ == '__main__':
 
     rospy.sleep(1.0)
     pub_init.publish(init_msg)
-    rospy.sleep(0.5)  # drop off previous poses
 
     cmdcnt = 0
     rate = rospy.Rate(20)
 
-    # try heading 
+    phase = 1
+    period = 2 * np.pi / (np.tan(steering_angle) * velocity / tires_dist)
+    print "period =", period, "secs"
+    period = rospy.Duration(period)
+    start_time = rospy.Time.now()
+    
     while not rospy.is_shutdown():
+        t = rospy.Time.now()
+        if t - start_time > period:
+            if phase < 2:
+                phase = 2
+                steering_angle = -steering_angle
+                start_time = t
+            else: break
         cmd = AckermannDriveStamped()
         cmd.header.stamp = rospy.Time.now()
         cmd.header.frame_id = "/map"
         cmd.header.seq = cmdcnt
-        cmd.drive.steering_angle = steering_angle * heading_flag 
-        cmd.drive.speed = velocity * velocity_flag
+        cmd.drive.steering_angle = steering_angle
+        cmd.drive.speed = velocity
         pub_nav0.publish(cmd)
         cmdcnt += 1
         rate.sleep()
-
-    rospy.spin()
 
