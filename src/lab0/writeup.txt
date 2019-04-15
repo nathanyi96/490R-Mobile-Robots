@@ -1,14 +1,20 @@
-(a). 
-Real world recorded bag is more noisy.
+(a).
+When we run Real_Bag on real robot or run Sim_Bag on simulation, everything went well as expected. However, when we run Real_Bag on simulation or run Sim_Bag on real robot, things went significantly different. The differences are:
+	(1) when running Real_Bag on simulation, the "fig8" in simulation looks like an "S", because the car didn't complete the first cirle of "fig8" as well as the second one.
+	(2) when running Sim_Bag on real robot, the car will overshoot one more circle when drawing either the first cirle or the second of "fig8".
 
 (b).
-?
+It depends on the context of the bag file. We recorded two corresponding rosbags. One in simulation and another in real robot. When we play back Real_Bag, it works well as expected, with the distance and direction off by only a little; when playing back Sim_Bag, it performs similarly as in (a), with the overshooting issue. The car didn't follow exactly the path we saw in the simulation, although it performs the corresponding turns in roughly the same order. We think there might be deficiencies in the accuracy of the control input sent from the rosbag and the actual output performed by the real car, while such problem does not exist in simulation. Therefore, we couldn't see the expected behavior if the playing environment does not match the environment of the recording. Moreover, the deficiencies also explain the mismatches between the outcomes in simulation and on real robot with the same bag.
 
 (c).
 4.1
 We create a fig8 node that would drive the car in a "8" path which is modeled as two circles. The saved marker for one drawing is attached. We create a subscriber that listens to the current heading of the robot. We use this subscriber to detect if the car finishes one circle, after which we negate the steering angle and the car starts to draw another circle in other direction. Given any steering angle and velocity, the robot is able to run in a 8 path with fairly high accuracy. However, some problems include,
 	(1) the subcribed headings do not correspond well with the time they are received.
 	(2) from time to time the noises of car's heading from the visualization cause the program to intepret that the car has finished the circles.
-Alternatively, we implemented another approach that applies the the kinematic car's motion model to estimate the time peroid of running a circle. This approach does not involve the above issues but have less accurate circles with varying velocity and steering angle parameters. This node is written in the file fig8_time.py.
+Alternatively, we implemented another approach that applies the the kinematic car's motion model to estimate the time peroid of running a circle. This approach does not involve the above issues and can be run without knowing the state of the car, but have less accurate circles with varying velocity and steering angle parameters. This node is written in the file fig8_time.py, and is the one run by fig8.launch.
 
-4.2 We create a safety controller that includes a subscriber for the laser scan and a publisher to the safety topic. Among all valid returned laser readings, we define a safety condition as more than 5 laser readings closer than 0.5m exist, and we publish a 0-velocity to stop the car. The reason why we create such threshold is that in simulation, the laser scan is noisy. 
+In addition, we tried running the second approach on the real car, and as in (a), the overshooting issue occurred even though the car followed the correct timing to adjust its steering angle. We therefore measured the actual velocity and steering angle when publishing the command with velocity=2.0 (m/s) and steering_angle=0.34 (rad). It turned out the measurement is real_velocity=1.77 (m/s) and real_steering_angle=0.48 (rad). This confirmed our reasoning about the mismatch of control input/output mentioned in (b).
+
+
+
+4.2 We create a safety controller that includes a subscriber for the laser scan and a publisher to the safety topic. Among all valid returned laser readings, we define a safety condition as more than 5 laser readings closer than 1 meter exist, and we publish a 0-velocity to stop the car. The reason why we create such threshold is that the laser scan is noisy. Setting a threshold > 1 will increase the liklihood that an obstacle is actually present within the specified distance.
