@@ -1,9 +1,6 @@
 # CMake generated Testfile for 
-# Source directory: /home/robots/490R_Projects/src
-# Build directory: /home/robots/490R_Projects/build
+# Source directory: /home/robots/490R_Projects/src/lab1
+# Build directory: /home/robots/490R_Projects/build/lab1
 # 
 # This file includes the relevant testing commands required for 
 # testing this directory and lists subdirectories to be tested as well.
-subdirs(gtest)
-subdirs(lab0)
-subdirs(lab1)

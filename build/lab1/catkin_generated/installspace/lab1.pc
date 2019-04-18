@@ -1,0 +1,8 @@
+prefix=/home/robots/490R_Projects/install
+
+Name: lab1
+Description: Description of lab1
+Version: 0.0.0
+Cflags: 
+Libs: -L/home/robots/490R_Projects/install/lib 
+Requires: 

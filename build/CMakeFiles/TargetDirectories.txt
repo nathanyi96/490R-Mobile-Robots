@@ -40,3 +40,10 @@
 /home/robots/490R_Projects/build/lab0/CMakeFiles/test.dir
 /home/robots/490R_Projects/build/lab0/CMakeFiles/edit_cache.dir
 /home/robots/490R_Projects/build/lab0/CMakeFiles/rebuild_cache.dir
+/home/robots/490R_Projects/build/lab1/CMakeFiles/list_install_components.dir
+/home/robots/490R_Projects/build/lab1/CMakeFiles/install.dir
+/home/robots/490R_Projects/build/lab1/CMakeFiles/rebuild_cache.dir
+/home/robots/490R_Projects/build/lab1/CMakeFiles/install/strip.dir
+/home/robots/490R_Projects/build/lab1/CMakeFiles/install/local.dir
+/home/robots/490R_Projects/build/lab1/CMakeFiles/test.dir
+/home/robots/490R_Projects/build/lab1/CMakeFiles/edit_cache.dir
