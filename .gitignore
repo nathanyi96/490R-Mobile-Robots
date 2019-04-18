@@ -5,3 +5,6 @@
 *.o
 *.obj
 *.mtl
+devel/
+build/
+*.bag
