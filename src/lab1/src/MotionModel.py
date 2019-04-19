@@ -10,11 +10,11 @@ from vesc_msgs.msg import VescStateStamped
 import matplotlib.pyplot as plt
 
 #Tune these Values!
-KM_V_NOISE = 0.04            # Kinematic car velocity noise std dev
-KM_DELTA_NOISE = 0.065             # Kinematic car delta noise std dev
-KM_X_FIX_NOISE = 1e-2          # Kinematic car x position constant noise std dev
-KM_Y_FIX_NOISE = 1e-2        # Kinematic car y position constant noise std dev
-KM_THETA_FIX_NOISE = 1e-2      # Kinematic car theta constant noise std dev
+KM_V_NOISE = 0.4          # Kinematic car velocity noise std dev
+KM_DELTA_NOISE = 0.2             # Kinematic car delta noise std dev
+KM_X_FIX_NOISE = 3e-2          # Kinematic car x position constant noise std dev
+KM_Y_FIX_NOISE = 3e-2        # Kinematic car y position constant noise std dev
+KM_THETA_FIX_NOISE = 1e-1      # Kinematic car theta constant noise std dev
 
 
 # #Tune these Values!
@@ -22,6 +22,13 @@ KM_THETA_FIX_NOISE = 1e-2      # Kinematic car theta constant noise std dev
 # KM_DELTA_NOISE = 0.06          # Kinematic car delta noise std dev
 # KM_X_FIX_NOISE = 3e-2          # Kinematic car x position constant noise std dev
 # KM_Y_FIX_NOISE = 1e-3        # Kinematic car y position constant noise std dev
+# KM_THETA_FIX_NOISE = 1e-2      # Kinematic car theta constant noise std dev
+
+# #Tune these Values!
+# KM_V_NOISE = 0.015            # Kinematic car velocity noise std dev
+# KM_DELTA_NOISE = 0.065             # Kinematic car delta noise std dev
+# KM_X_FIX_NOISE = 1e-2          # Kinematic car x position constant noise std dev
+# KM_Y_FIX_NOISE = 1e-2        # Kinematic car y position constant noise std dev
 # KM_THETA_FIX_NOISE = 1e-2      # Kinematic car theta constant noise std dev
 
 '''
@@ -113,18 +120,17 @@ class KinematicMotionModel:
     
     # Separate control 
     v, delta, dt = control
-    # Add control noise
-
-
     v_mag = np.abs(v)
     delta_mag = np.abs(delta)
-
+    
+    # YOUR CODE HERE
+    # Add control noise
     v = np.random.normal(loc=v, scale=KM_V_NOISE, size=proposal_dist[:,0].shape) 
     delta = np.random.normal(loc=delta, scale=KM_DELTA_NOISE, size=proposal_dist[:,0].shape)
-    # YOUR CODE HERE
+    
+    # apply motion model's update rule
     theta = proposal_dist[:,2]
     theta_new = theta + v / self.CAR_LENGTH * np.tan(delta) * dt
-
     proposal_dist[:,0] += (self.CAR_LENGTH / np.tan(delta) * (np.sin(theta_new) - np.sin(theta)))   # x
     proposal_dist[:,1] += (self.CAR_LENGTH / np.tan(delta) * (-np.cos(theta_new) + np.cos(theta)))  # y
 
@@ -132,7 +138,6 @@ class KinematicMotionModel:
     proposal_dist[:,0] = np.random.normal(loc=proposal_dist[:,0], scale=KM_X_FIX_NOISE, size=proposal_dist[:,0].shape)
     proposal_dist[:,1] = np.random.normal(loc=proposal_dist[:,1], scale=KM_Y_FIX_NOISE, size=proposal_dist[:,1].shape)    
     proposal_dist[:,2] = np.random.normal(loc=theta_new, scale=KM_THETA_FIX_NOISE, size=proposal_dist[:,2].shape)
-    #proposal_dist[:,2] = np.random.normal(proposal_dist[:,2], KM_THETA_FIX_NOISE, proposal_dist[:,2].shape)
     #print 'v: %f, delta: %f, x: %f, y: %f, theta: %f'%(np.mean(v), np.mean(delta), np.mean(proposal_dist[:,0]), np.mean(proposal_dist[:,1]), np.mean(proposal_dist[:,2]))
     
     # Limit particle rotation to be between -pi and pi

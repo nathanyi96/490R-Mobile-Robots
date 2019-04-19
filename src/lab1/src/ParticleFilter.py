@@ -56,7 +56,7 @@ class ParticleFilter():
 
     self.particle_indices = np.arange(self.N_PARTICLES) # Cached list of particle indices
     self.particles = np.zeros((self.N_PARTICLES,3)) # Numpy matrix of dimension N_PARTICLES x 3
-    self.weights = np.ones(self.N_PARTICLES) / float(self.N_PARTICLES) # Numpy matrix containig weight for each particle
+    self.weights = np.ones(self.N_PARTICLES) / float(self.N_PARTICLES) # Numpy matrix containing weight for each particle
 
     self.state_lock = Lock() # A lock used to prevent concurrency issues. You do not need to worry about this
     
@@ -74,7 +74,9 @@ class ParticleFilter():
 
     # Globally initialize the particles
     self.initialize_global()
-   
+    # first_scan = rospy.wait_for_message(scan_topic, LaserScan)
+    # self.initialize_global_loc(first_scan)
+    
     # Publish particle filter state
     self.pub_tf = tf.TransformBroadcaster() # Used to create a tf between the map and the laser for visualization    
     self.pose_pub      = rospy.Publisher(PUBLISH_PREFIX + "/inferred_pose", PoseStamped, queue_size = 1) # Publishes the expected pose
@@ -87,7 +89,7 @@ class ParticleFilter():
     # An object used for applying sensor model
     self.sensor_model = SensorModel(scan_topic, laser_ray_step, exclude_max_range_rays, 
                                     max_range_meters, map_msg, self.particles, self.weights,car_length,
-                                    self.state_lock) 
+                                    self.state_lock)
     
     # An object used for applying kinematic motion model
     self.motion_model = KinematicMotionModel(motor_state_topic, servo_state_topic, 
@@ -95,8 +97,11 @@ class ParticleFilter():
           steering_angle_to_servo_offset, steering_angle_to_servo_gain, 
           car_length, self.particles, self.state_lock) 
 
+    self.initialize_global_loc2()
+
+
     # Subscribe to the '/initialpose' topic. Publised by RVIZ. See clicked_pose_cb function in this file for more info
-    self.pose_sub  = rospy.Subscriber("/initialpose", PoseWithCovarianceStamped, self.clicked_pose_cb, queue_size=1)
+    # self.pose_sub  = rospy.Subscriber("/initialpose", PoseWithCovarianceStamped, self.clicked_pose_cb, queue_size=1)
     
     print('Initialization complete')
 
@@ -130,6 +135,9 @@ class ParticleFilter():
     self.weights[:] = 1.0 / self.particles.shape[0]
   
     self.state_lock.release()
+ 
+
+  def initialize_global_loc2(self):
     
   '''
     Publish a tf between the laser and the map
@@ -182,14 +190,14 @@ class ParticleFilter():
     returns: nothing
   '''
   def clicked_pose_cb(self, msg):
-    VAR_X = 0.001
-    VAR_Y = 0.001
-    VAR_THETA = 0.001
     self.state_lock.acquire()
     pose = msg.pose.pose
     print "SETTING POSE"
+
     #YOUR CODE HERE
-    self.state_lock.release()
+    VAR_X = 0.001
+    VAR_Y = 0.001
+    VAR_THETA = 0.001
     quat = pose.orientation
     theta = Utils.quaternion_to_angle(quat)
     x = pose.position.x
@@ -197,7 +205,57 @@ class ParticleFilter():
     self.particles[:,0] = np.random.normal(x, VAR_X, self.particles.shape[0])
     self.particles[:,1] = np.random.normal(y, VAR_Y, self.particles.shape[0])
     self.particles[:,2] = np.random.normal(theta, VAR_THETA, self.particles.shape[0])
-    self.weights[:] = np.ones(self.N_PARTICLES) / float(self.N_PARTICLES)
+    self.weights.fill(1 / self.N_PARTICLES)
+
+    self.state_lock.release()
+
+  '''
+    Students implement (extra credit)
+    Initialize the particles to cover the map for global localization.
+    Call this instead of initialize_global() in __init__().
+  '''
+  def initialize_global_loc(self, scan):
+    self.state_lock.acquire()
+    
+    # Get in-bounds locations
+    permissible_x, permissible_y = np.where(self.permissible_region == 1)
+    
+    angle_step = 4 # The number of particles at each location, each with different rotation
+    num_particles = max(self.particles.shape[0] * 10, len(permissible_x) * angle_step)
+    num_locations = num_particles / angle_step
+    permissible_step = len(permissible_x)/num_locations # The sample interval for permissible states
+    indices = np.arange(0, len(permissible_x), permissible_step)[:num_locations] # Indices of permissible states to use
+    permissible_states = np.zeros((num_particles,3)) # Proxy for the new particles
+    permissible_weights = np.full(num_particles, 1 / num_particles)
+    
+    # Loop through permissible states, each iteration drawing particles with
+    # different rotation
+    for i in xrange(angle_step):
+      permissible_states[i*num_locations:(i+1)*num_locations,0] = permissible_y[indices]
+      permissible_states[i*num_locations:(i+1)*num_locations,1] = permissible_x[indices]
+      permissible_states[i*num_locations:(i+1)*num_locations,2] = i*(2*np.pi / angle_step)
+     
+    # Transform permissible states to be w.r.t world 
+    Utils.map_to_world(permissible_states, self.map_info)
+    
+    # TODO: Weight permissible_states by sensor model
+    # 
+    # pseudocode:
+    # foreach states_i in permissible_states:
+    #     expected_scan = perform ray casting
+    #     likelihood = prob of scan given expected_scan
+    #     weights of states_i = likelihood
+    # normalize weights to be a probability
+
+    # From the weights, sample self.particles.shape[0] particles
+    particles = np.random.choice(permissible_states, size=self.particles.shape[0], replace=True, p=permissible_weights)
+
+    # Reset particles and weights
+    self.particles[:,:] = particles[:,:]
+    self.weights[:] = 1.0 / self.particles.shape[0]
+  
+    self.state_lock.release()
+
   '''
     Visualize the current state of the filter
    (1) Publishes a tf between the map and the laser. Necessary for visualizing the laser scan in the map
