@@ -14,13 +14,19 @@ from sensor_msgs.msg import LaserScan
 THETA_DISCRETIZATION = 112 # Discretization of scanning angle
 INV_SQUASH_FACTOR = 0.2    # Factor for helping the weight distribution to be less peaked
 
-#Tune these Values!
-Z_SHORT = 0.05  # Weight for short reading
+
+Z_SHORT = 0.1  # Weight for short reading
 Z_MAX = 0.05    # Weight for max reading
 Z_RAND = 0.05   # Weight for random reading
-SIGMA_HIT = 20.0 # Noise value for hit reading
-Z_HIT = 0.85    # Weight for hit reading
-LAMBDA_SHORT = 0.1 # short reading linear coefficient
+SIGMA_HIT = 8.0 # Noise value for hit reading
+Z_HIT = 0.8    # Weight for hit reading
+
+#Tune these Values!
+# Z_SHORT = 0.05  # Weight for short reading
+# Z_MAX = 0.05    # Weight for max reading
+# Z_RAND = 0.05   # Weight for random reading
+# SIGMA_HIT = 20.0 # Noise value for hit reading
+# Z_HIT = 0.85    # Weight for hit reading
 
 #Tune these Values!
 # Z_SHORT = 0.1  # Weight for short reading
@@ -33,7 +39,7 @@ LAMBDA_SHORT = 0.1 # short reading linear coefficient
 ''' 
   Weights particles according to their agreement with the observed data
 '''
-class SensorModel:
+class SensorModel(object):
 	
   '''
   Initializes the sensor model
@@ -124,6 +130,7 @@ class SensorModel:
     self.last_laser = msg
     self.do_resample = True
     #print 'Finished lidar cb'
+    print 'Finished lidar cb from', self.particles.shape
     self.state_lock.release()
     
   '''
@@ -145,7 +152,7 @@ class SensorModel:
     def pdf(z_obs, z):
         var = SIGMA_HIT ** 2
         p_hit = (1 / np.sqrt(2 * np.pi * var)) * np.exp(-(np.power(z_obs - z, 2) / (2 * var))) # gaussian
-        p_short = (z_obs < z) * 2 * LAMBDA_SHORT * (z - z_obs) / (z + 1e-12) / (LAMBDA_SHORT*(z+1e-12))# linear
+        p_short = (z_obs < z) * 2 * (z - z_obs) / (z + 1e-12) / (z+1e-12) # linear
         p_rand = 1.0 / max_range_px # uniform
         p_max = (z_obs == max_range_px) # only max
         return Z_HIT * p_hit + Z_SHORT * p_short + Z_MAX * p_max + Z_RAND * p_rand

@@ -13,9 +13,11 @@ from geometry_msgs.msg import PoseStamped, PoseArray, PoseWithCovarianceStamped,
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry,OccupancyGrid
 
+import math
 from ReSample import ReSampler
 from SensorModel import SensorModel
 from MotionModel import  KinematicMotionModel
+from GlobalLocSensorModel import GlobalLocSensorModel
 
 MAP_TOPIC = "/map"
 PUBLISH_PREFIX = '/pf/viz'
@@ -74,8 +76,6 @@ class ParticleFilter():
 
     # Globally initialize the particles
     self.initialize_global()
-    # first_scan = rospy.wait_for_message(scan_topic, LaserScan)
-    # self.initialize_global_loc(first_scan)
     
     # Publish particle filter state
     self.pub_tf = tf.TransformBroadcaster() # Used to create a tf between the map and the laser for visualization    
@@ -97,20 +97,28 @@ class ParticleFilter():
           steering_angle_to_servo_offset, steering_angle_to_servo_gain, 
           car_length, self.particles, self.state_lock) 
 
-    self.initialize_global_loc2()
-
+    # self.global_localize_cnt = 1                                          
+    # self.global_localize = True
+    #self.initialize_global_loc2()
+    
 
     # Subscribe to the '/initialpose' topic. Publised by RVIZ. See clicked_pose_cb function in this file for more info
-    # self.pose_sub  = rospy.Subscriber("/initialpose", PoseWithCovarianceStamped, self.clicked_pose_cb, queue_size=1)
+    self.pose_sub  = rospy.Subscriber("/initialpose", PoseWithCovarianceStamped, self.clicked_pose_cb, queue_size=1)
     
+    self.gl_sensor_model = None
+    #rospy.sleep(1.0)
+    #print "calling global localization"
+    #self.initialize_global_loc(scan_topic, laser_ray_step, exclude_max_range_rays, 
+    #                               max_range_meters, map_msg, car_length)
+
     print('Initialization complete')
+
 
   '''
     Initialize the particles to cover the map
   '''
   def initialize_global(self):
     self.state_lock.acquire()
-    
     # Get in-bounds locations
     permissible_x, permissible_y = np.where(self.permissible_region == 1)
     
@@ -133,12 +141,61 @@ class ParticleFilter():
     # Reset particles and weights
     self.particles[:,:] = permissible_states[:,:]
     self.weights[:] = 1.0 / self.particles.shape[0]
-  
     self.state_lock.release()
  
 
   def initialize_global_loc2(self):
+    angle_step = 4.0  # The number of particles at each location, each with different rotation    
+    # Reset particles and weights
+    self.initialize_global()
+    self.state_lock.acquire() 
+
+    def split_particle(state, d, num):
+        state = Utils.map_to_world(state, self.map_info)
+        x, y = state[0], state[1]
+        x_start = int(max(x-d, 0)); y_start = int(max(y-d, 0)); 
+        x_end = int(min(x+d, self.permissible_region.shape[0] - 1)); int(y_end = min(y+d, self.permissible_region.shape[1] - 1));
+        print x, y, x_start, y_start, x_end, y_end
+        permissible_x, permissible_y = np.where(self.permissible_region[x_start:x_end, y_start:y_end] == 1)
+        if len(permissible_x) == 0:
+            return np.zeros([0,3])
+        print 'split particle', len(permissible_x), num, d
+        permissible_step = angle_step*len(permissible_x)/num
+        indices = np.arange(0, len(permissible_x), permissible_step)[:(num/angle_step)] # Indices of permissible states to use
+        permissible_states = np.zeros((self.particles.shape[0],3)) # Proxy for the new particles
+
+        for i in xrange(angle_step):
+            permissible_states[i*(num/angle_step):(i+1)*(num/angle_step),0] = permissible_y[indices]
+            permissible_states[i*(num/angle_step):(i+1)*(num/angle_step),1] = permissible_x[indices]
+            permissible_states[i*(num/angle_step):(i+1)*(num/angle_step),2] = i*(2*np.pi / angle_step) 
+     
+        # Transform permissible states to be w.r.t world 
+        Utils.map_to_world(permissible_states, self.map_info)        
+        return permissible_states
     
+    particles_num = self.particles.shape[0]
+    alpha = 5.0; selection_num = int(particles_num / (alpha ** self.global_localize_cnt));
+    d = int(self.permissible_region.shape[0] / (alpha ** self.global_localize_cnt)); # decrease radius and selection number
+    current_particles = self.particles[:]
+    candidate_indices = np.random.choice(self.particle_indices, selection_num, p=self.weights) # use top 3
+    candidates = current_particles[candidate_indices]
+    print 'current neighbor', d, candidate_indices, candidates.shape[0], selection_num
+
+    new_particles = []
+    for idx in range(candidates.shape[0]):
+        candidate = candidates[idx]
+        new_particles.append(split_particle(candidate, d, selection_num))
+    new_particles = np.concatenate(new_particles, axis=0)
+    particles_num = new_particles.shape[0]
+    current_particles[:particles_num] = new_particles[:particles_num] # more fine grained particle
+    self.particles[:] = current_particles[:]
+    self.weights[:] = 1.0 / particles_num   
+    if self.global_localize_cnt > int(math.log(particles_num, alpha)): # finish and return to normal
+        self.global_localize = False
+        self.global_localize_cnt +=  1
+        self.particles[:,:] = current_particles[:,:]
+        self.weights[:] = 1.0 / particles_num       
+        self.state_lock.release()  
   '''
     Publish a tf between the laser and the map
     This is necessary in order to visualize the laser scan within the map
@@ -214,19 +271,21 @@ class ParticleFilter():
     Initialize the particles to cover the map for global localization.
     Call this instead of initialize_global() in __init__().
   '''
-  def initialize_global_loc(self, scan):
+  def initialize_global_loc(self, scan_topic, laser_ray_step, exclude_max_range_rays, 
+                                    max_range_meters, map_msg, car_length):
+    print "initialize_global_loc"
     self.state_lock.acquire()
     
     # Get in-bounds locations
     permissible_x, permissible_y = np.where(self.permissible_region == 1)
     
     angle_step = 4 # The number of particles at each location, each with different rotation
-    num_particles = max(self.particles.shape[0] * 10, len(permissible_x) * angle_step)
+    num_particles = min(self.particles.shape[0]*10, len(permissible_x) * angle_step)
     num_locations = num_particles / angle_step
     permissible_step = len(permissible_x)/num_locations # The sample interval for permissible states
     indices = np.arange(0, len(permissible_x), permissible_step)[:num_locations] # Indices of permissible states to use
     permissible_states = np.zeros((num_particles,3)) # Proxy for the new particles
-    permissible_weights = np.full(num_particles, 1 / num_particles)
+    permissible_weights = np.full(num_particles, 1.0 / num_particles)
     
     # Loop through permissible states, each iteration drawing particles with
     # different rotation
@@ -234,7 +293,6 @@ class ParticleFilter():
       permissible_states[i*num_locations:(i+1)*num_locations,0] = permissible_y[indices]
       permissible_states[i*num_locations:(i+1)*num_locations,1] = permissible_x[indices]
       permissible_states[i*num_locations:(i+1)*num_locations,2] = i*(2*np.pi / angle_step)
-     
     # Transform permissible states to be w.r.t world 
     Utils.map_to_world(permissible_states, self.map_info)
     
@@ -246,14 +304,11 @@ class ParticleFilter():
     #     likelihood = prob of scan given expected_scan
     #     weights of states_i = likelihood
     # normalize weights to be a probability
+    self.publish_particles(permissible_states)
+   
+    self.gl_sensor_model = GlobalLocSensorModel(scan_topic, laser_ray_step, exclude_max_range_rays, max_range_meters, map_msg,
+                                            permissible_states, permissible_weights, car_length, self.particles, self.weights, update_times=100)
 
-    # From the weights, sample self.particles.shape[0] particles
-    particles = np.random.choice(permissible_states, size=self.particles.shape[0], replace=True, p=permissible_weights)
-
-    # Reset particles and weights
-    self.particles[:,:] = particles[:,:]
-    self.weights[:] = 1.0 / self.particles.shape[0]
-  
     self.state_lock.release()
 
   '''
@@ -339,13 +394,22 @@ if __name__ == '__main__':
   
   while not rospy.is_shutdown(): # Keep going until we kill it
     # Callbacks are running in separate threads
-    if pf.sensor_model.do_resample: # Check if the sensor model says it's time to resample
+    # if pf.global_localize: # no resample
+    #     temp = pf.N_VIZ_PARTICLES
+    #     pf.N_VIZ_PARTICLES = 100
+    #     pf.visualize()
+    #     rospy.sleep(1.0)
+    #     pf.initialize_global_loc2()
+    #     pf.N_VIZ_PARTICLES = temp
+    # elif pf.sensor_model.do_resample: # Check if the sensor model says it's time to resample
+    if pf.sensor_model.do_resample:
       pf.sensor_model.do_resample = False # Reset so that we don't keep resampling
-      
       # Resample
       pf.resampler.resample_low_variance()
 
       pf.visualize() # Perform visualization
+    if pf.gl_sensor_model and pf.gl_sensor_model.alive:
+        pf.publish_particles(pf.gl_sensor_model.particles)
 
 
 

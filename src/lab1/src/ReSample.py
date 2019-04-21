@@ -39,6 +39,10 @@ class ReSampler:
     self.state_lock.acquire()
     
     #YOUR CODE HERE
+    print "let's resample ----------"
+    
+    if abs(self.weights.sum() - 1.0) > 1e-6:
+        return
 
     M = self.particles.shape[0]
     avg = 1.0 / M
@@ -46,13 +50,13 @@ class ReSampler:
     r = np.random.uniform(0, avg)
     bins = np.arange(M) * avg + r 
     particles = np.zeros_like(self.particles)
-    cnt = 0; idx = 0
+    cnt, idx = 0, 0
     while idx < M:
         if bins[idx] < cdf[cnt]:
             particles[idx] = self.particles[cnt] # assign the particle
             idx += 1
         else:
-            cnt += 1 
+            cnt += 1
     self.particles[:] = particles[:]
     self.weights[:] = avg
 
