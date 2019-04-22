@@ -149,24 +149,24 @@ class ParticleFilter():
     # Reset particles and weights
     self.state_lock.acquire() 
     angle_step = 4  # The number of particles at each location, each with different rotation
-    radius_factor = 10.0
+    radius_factor = 3.0
     print 'initialize_global_loc2'
     
-    def upsample(state, d, num):
+    def upsample(state, radius, num):
         '''
         Sample and return num particles around state, within a l-inf radius of d.
         state : 1x3 ndarray - the state to resample around
-        d     : float       - l-inf radius of the neighborhood (in units of state)
-        num   : int         - number of particles sampled around the neighborhood of state
+        radius: float  - l-inf radius of the neighborhood (in units of state)
+        num   : int   - number of particles sampled around the neighborhood of state
         '''
         Utils.world_to_map(state, self.map_info)
 
         #print '--------- this is a state', state
         x, y =  int(state[0, 0]), int(state[0, 1])
-        x_start = max(x-d, 0)
-        y_start = max(y-d, 0)
-        x_end = min(x+d, self.map_info.height)
-        y_end = min(y+d, self.map_info.width)
+        x_start = max(x-radius, 0)
+        y_start = max(y-radius, 0)
+        x_end = min(x+radius, self.map_info.height)
+        y_end = min(y+radius, self.map_info.width)
         #print 'neighbor: x: {}, y: {}, x_start: {}, y_start: {}, x_end: {}, y_end: {}, d: {}, num: {}'.format( 
         #    x, y, x_start, y_start, x_end, y_end, d, num)
         state_offset = np.array([[x_start, y_start, 0]])
@@ -178,9 +178,10 @@ class ParticleFilter():
         permissible_x, permissible_y = np.where(self.permissible_region[y_start:y_end, x_start:x_end] == 1)
         permissible_step = len(permissible_x) / num_locations
 
+        print 'step', permissible_step, num_locations, len(permissible_x)
         if len(permissible_x) < num_locations:
             return np.zeros([0,3])
-        indices = np.arange(0, num_locations, permissible_step) # Indices of permissible states to use
+        indices = np.arange(0, len(permissible_x), permissible_step)[:num_locations] # Indices of permissible states to use
         permissible_states = np.zeros((num, 3)) # Proxy for the new particles
 
         for i in xrange(int(angle_step)):
@@ -191,15 +192,13 @@ class ParticleFilter():
      
         # Transform permissible states to be w.r.t world
         permissible_states += state_offset
-        print "type --------", permissible_states.dtype
         Utils.map_to_world(permissible_states, self.map_info)
-        print state_offset, np.mean(permissible_states, axis=0)
         return permissible_states
 
     particles_num = self.particles.shape[0]
-    ; # selection_num = int(particles_num / (radius_factor ** self.global_localize_cnt));
+    # selection_num = int(particles_num / (radius_factor ** self.global_localize_cnt));
     radius = int(min(self.map_info.height, self.map_info.width) / (radius_factor ** self.global_localize_cnt)); # decrease radius and selection number
-    print 'current radius', d
+    print 'current radius', radius
     particle_candidate_num = 25; upsample_candidate = int(particles_num / particle_candidate_num); 
     current_particles = self.particles[:]
     candidate_indices = np.random.choice(self.particle_indices, particle_candidate_num, p=self.weights) # use top 3
@@ -208,20 +207,18 @@ class ParticleFilter():
     new_particles = []
     for idx in range(candidates.shape[0]):
         candidate = candidates[[idx]]
-        candidates_upsample = upsample(candidate, d, upsample_candidate)
+        candidates_upsample = upsample(candidate, radius, upsample_candidate)
         #print 'upsample shape', candidates_upsample.shape
         new_particles.append(candidates_upsample)
     new_particles = np.concatenate(new_particles, axis=0)
+    print 'total upsample shape', new_particles.shape[0]
     particles_num = new_particles.shape[0]
     current_particles[:particles_num] = new_particles[:particles_num] # more fine grained particle
-    #self.particles[:] = current_particles[:]
     self.weights[:] = 1.0 / particles_num   
     
     self.global_localize_cnt +=  1
-    if self.global_localize_cnt > 10: # finish and return to normal
+    if self.global_localize_cnt > 5: # finish and return to normal
         self.global_localize = False    
-        self.particles[:,:] = current_particles[:permissible_region,:]
-        self.weights[:] = 1.0 / particles_num       
     self.state_lock.release()  
   '''
     Publish a tf between the laser and the map
@@ -425,7 +422,7 @@ if __name__ == '__main__':
         temp = pf.N_VIZ_PARTICLES
         pf.N_VIZ_PARTICLES = 1000
         pf.visualize()
-        rospy.sleep(1.0)
+        rospy.sleep(2.0)
         pf.initialize_global_loc2()
         pf.N_VIZ_PARTICLES = temp
         pf.sensor_model.do_resample = False
