@@ -149,51 +149,56 @@ class ParticleFilter():
     # Reset particles and weights
     self.state_lock.acquire() 
     angle_step = 4  # The number of particles at each location, each with different rotation
+    radius_factor = 10.0
     print 'initialize_global_loc2'
     
     def upsample(state, d, num):
         '''
         Sample and return num particles around state, within a l-inf radius of d.
-        state : 3x1 ndarray - the state to resample around
+        state : 1x3 ndarray - the state to resample around
         d     : float       - l-inf radius of the neighborhood (in units of state)
         num   : int         - number of particles sampled around the neighborhood of state
         '''
         Utils.world_to_map(state, self.map_info)
+
         #print '--------- this is a state', state
-        x, y =  state[0, 0], state[0, 1]
-        x_start, y_start = x-d, y-d
-        x_end, y_end = x+d, y+d
+        x, y =  int(state[0, 0]), int(state[0, 1])
+        x_start = max(x-d, 0)
+        y_start = max(y-d, 0)
+        x_end = min(x+d, self.map_info.height)
+        y_end = min(y+d, self.map_info.width)
         #print 'neighbor: x: {}, y: {}, x_start: {}, y_start: {}, x_end: {}, y_end: {}, d: {}, num: {}'.format( 
         #    x, y, x_start, y_start, x_end, y_end, d, num)
-        state_offset = np.array([[x_start, y_start, 0]]).astype(np.float32)
+        state_offset = np.array([[x_start, y_start, 0]])
+        #print x, y, x_start, y_start, x_end, y_end, state_offset.dtype
 
-        Utils.map_to_world(state_offset, self.map_info)
+        #print self.permissible_region.shape, self.map_info.height, self.map_info.width, self.map_info.resolution
 
-        # print self.permissible_region.shape, self.map_info.height, self.map_info.width, self.map_info.resolution
-
+        num_locations = num / angle_step
         permissible_x, permissible_y = np.where(self.permissible_region[y_start:y_end, x_start:x_end] == 1)
-        permissible_step = int(1.0 * angle_step * len(permissible_x)/num)
+        permissible_step = len(permissible_x) / num_locations
 
-        if len(permissible_x) == 0 or permissible_step == 0:
+        if len(permissible_x) < num_locations:
             return np.zeros([0,3])
-        indices = np.arange(0, len(permissible_x), permissible_step)[:num/angle_step] # Indices of permissible states to use
+        indices = np.arange(0, num_locations, permissible_step) # Indices of permissible states to use
         permissible_states = np.zeros((num, 3)) # Proxy for the new particles
 
         for i in xrange(int(angle_step)):
-            permissible_states[i*(num/angle_step):(i+1)*(num/angle_step),0] = permissible_y[indices]
-            permissible_states[i*(num/angle_step):(i+1)*(num/angle_step),1] = permissible_x[indices]
-            permissible_states[i*(num/angle_step):(i+1)*(num/angle_step),2] = i*(2*np.pi / angle_step) 
+            permissible_states[i*num_locations:(i+1)*num_locations,0] = permissible_y[indices]
+            permissible_states[i*num_locations:(i+1)*num_locations,1] = permissible_x[indices]
+            permissible_states[i*num_locations:(i+1)*num_locations,2] = i*(2*np.pi / angle_step) 
         # print 'upsample particles', len(permissible_x), num, d, indices.shape, state_offset
      
-        # Transform permissible states to be w.r.t world 
+        # Transform permissible states to be w.r.t world
+        permissible_states += state_offset
+        print "type --------", permissible_states.dtype
         Utils.map_to_world(permissible_states, self.map_info)
-        permissible_states += state_offset 
         print state_offset, np.mean(permissible_states, axis=0)
         return permissible_states
 
     particles_num = self.particles.shape[0]
-    alpha = 10.0; # selection_num = int(particles_num / (alpha ** self.global_localize_cnt));
-    d = int(min(self.map_info.height, self.map_info.width) / (alpha ** self.global_localize_cnt)); # decrease radius and selection number
+    ; # selection_num = int(particles_num / (radius_factor ** self.global_localize_cnt));
+    radius = int(min(self.map_info.height, self.map_info.width) / (radius_factor ** self.global_localize_cnt)); # decrease radius and selection number
     print 'current radius', d
     particle_candidate_num = 25; upsample_candidate = int(particles_num / particle_candidate_num); 
     current_particles = self.particles[:]
