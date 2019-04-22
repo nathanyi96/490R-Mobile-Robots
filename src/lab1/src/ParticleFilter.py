@@ -97,18 +97,18 @@ class ParticleFilter():
           steering_angle_to_servo_offset, steering_angle_to_servo_gain, 
           car_length, self.particles, self.state_lock) 
 
-    # self.global_localize_cnt = 1                                          
-    # self.global_localize = True
-    #self.initialize_global_loc2()
+    self.global_localize_cnt = 1                                          
+    self.global_localize = True
+    self.initialize_global_loc2()
     
 
     # Subscribe to the '/initialpose' topic. Publised by RVIZ. See clicked_pose_cb function in this file for more info
-    self.pose_sub  = rospy.Subscriber("/initialpose", PoseWithCovarianceStamped, self.clicked_pose_cb, queue_size=1)
+    #self.pose_sub  = rospy.Subscriber("/initialpose", PoseWithCovarianceStamped, self.clicked_pose_cb, queue_size=1)
     
     self.gl_sensor_model = None
     #rospy.sleep(1.0)
     #print "calling global localization"
-    #self.initialize_global_loc(scan_topic, laser_ray_step, exclude_max_range_rays, 
+    # self.initialize_global_loc(scan_topic, laser_ray_step, exclude_max_range_rays, 
     #                               max_range_meters, map_msg, car_length)
 
     print('Initialization complete')
@@ -145,57 +145,79 @@ class ParticleFilter():
  
 
   def initialize_global_loc2(self):
-    angle_step = 4.0  # The number of particles at each location, each with different rotation    
+        
     # Reset particles and weights
-    self.initialize_global()
     self.state_lock.acquire() 
+    angle_step = 4  # The number of particles at each location, each with different rotation
+    print 'initialize_global_loc2'
+    
+    def upsample(state, d, num):
+        '''
+        Sample and return num particles around state, within a l-inf radius of d.
+        state : 3x1 ndarray - the state to resample around
+        d     : float       - l-inf radius of the neighborhood (in units of state)
+        num   : int         - number of particles sampled around the neighborhood of state
+        '''
+        Utils.world_to_map(state, self.map_info)
+        #print '--------- this is a state', state
+        x, y =  state[0, 0], state[0, 1]
+        x_start, y_start = x-d, y-d
+        x_end, y_end = x+d, y+d
+        #print 'neighbor: x: {}, y: {}, x_start: {}, y_start: {}, x_end: {}, y_end: {}, d: {}, num: {}'.format( 
+        #    x, y, x_start, y_start, x_end, y_end, d, num)
+        state_offset = np.array([[x_start, y_start, 0]]).astype(np.float32)
 
-    def split_particle(state, d, num):
-        state = Utils.map_to_world(state, self.map_info)
-        x, y = state[0], state[1]
-        x_start = int(max(x-d, 0)); y_start = int(max(y-d, 0)); 
-        x_end = int(min(x+d, self.permissible_region.shape[0] - 1)); int(y_end = min(y+d, self.permissible_region.shape[1] - 1));
-        print x, y, x_start, y_start, x_end, y_end
-        permissible_x, permissible_y = np.where(self.permissible_region[x_start:x_end, y_start:y_end] == 1)
-        if len(permissible_x) == 0:
+        Utils.map_to_world(state_offset, self.map_info)
+
+        # print self.permissible_region.shape, self.map_info.height, self.map_info.width, self.map_info.resolution
+
+        permissible_x, permissible_y = np.where(self.permissible_region[y_start:y_end, x_start:x_end] == 1)
+        permissible_step = int(1.0 * angle_step * len(permissible_x)/num)
+
+        if len(permissible_x) == 0 or permissible_step == 0:
             return np.zeros([0,3])
-        print 'split particle', len(permissible_x), num, d
-        permissible_step = angle_step*len(permissible_x)/num
-        indices = np.arange(0, len(permissible_x), permissible_step)[:(num/angle_step)] # Indices of permissible states to use
-        permissible_states = np.zeros((self.particles.shape[0],3)) # Proxy for the new particles
+        indices = np.arange(0, len(permissible_x), permissible_step)[:num/angle_step] # Indices of permissible states to use
+        permissible_states = np.zeros((num, 3)) # Proxy for the new particles
 
-        for i in xrange(angle_step):
+        for i in xrange(int(angle_step)):
             permissible_states[i*(num/angle_step):(i+1)*(num/angle_step),0] = permissible_y[indices]
             permissible_states[i*(num/angle_step):(i+1)*(num/angle_step),1] = permissible_x[indices]
             permissible_states[i*(num/angle_step):(i+1)*(num/angle_step),2] = i*(2*np.pi / angle_step) 
+        # print 'upsample particles', len(permissible_x), num, d, indices.shape, state_offset
      
         # Transform permissible states to be w.r.t world 
-        Utils.map_to_world(permissible_states, self.map_info)        
+        Utils.map_to_world(permissible_states, self.map_info)
+        permissible_states += state_offset 
+        print state_offset, np.mean(permissible_states, axis=0)
         return permissible_states
-    
+
     particles_num = self.particles.shape[0]
-    alpha = 5.0; selection_num = int(particles_num / (alpha ** self.global_localize_cnt));
-    d = int(self.permissible_region.shape[0] / (alpha ** self.global_localize_cnt)); # decrease radius and selection number
+    alpha = 10.0; # selection_num = int(particles_num / (alpha ** self.global_localize_cnt));
+    d = int(min(self.map_info.height, self.map_info.width) / (alpha ** self.global_localize_cnt)); # decrease radius and selection number
+    print 'current radius', d
+    particle_candidate_num = 25; upsample_candidate = int(particles_num / particle_candidate_num); 
     current_particles = self.particles[:]
-    candidate_indices = np.random.choice(self.particle_indices, selection_num, p=self.weights) # use top 3
+    candidate_indices = np.random.choice(self.particle_indices, particle_candidate_num, p=self.weights) # use top 3
     candidates = current_particles[candidate_indices]
-    print 'current neighbor', d, candidate_indices, candidates.shape[0], selection_num
 
     new_particles = []
     for idx in range(candidates.shape[0]):
-        candidate = candidates[idx]
-        new_particles.append(split_particle(candidate, d, selection_num))
+        candidate = candidates[[idx]]
+        candidates_upsample = upsample(candidate, d, upsample_candidate)
+        #print 'upsample shape', candidates_upsample.shape
+        new_particles.append(candidates_upsample)
     new_particles = np.concatenate(new_particles, axis=0)
     particles_num = new_particles.shape[0]
     current_particles[:particles_num] = new_particles[:particles_num] # more fine grained particle
-    self.particles[:] = current_particles[:]
+    #self.particles[:] = current_particles[:]
     self.weights[:] = 1.0 / particles_num   
-    if self.global_localize_cnt > int(math.log(particles_num, alpha)): # finish and return to normal
-        self.global_localize = False
-        self.global_localize_cnt +=  1
-        self.particles[:,:] = current_particles[:,:]
+    
+    self.global_localize_cnt +=  1
+    if self.global_localize_cnt > 10: # finish and return to normal
+        self.global_localize = False    
+        self.particles[:,:] = current_particles[:permissible_region,:]
         self.weights[:] = 1.0 / particles_num       
-        self.state_lock.release()  
+    self.state_lock.release()  
   '''
     Publish a tf between the laser and the map
     This is necessary in order to visualize the laser scan within the map
@@ -307,7 +329,7 @@ class ParticleFilter():
     self.publish_particles(permissible_states)
    
     self.gl_sensor_model = GlobalLocSensorModel(scan_topic, laser_ray_step, exclude_max_range_rays, max_range_meters, map_msg,
-                                            permissible_states, permissible_weights, car_length, self.particles, self.weights, update_times=100)
+                                            permissible_states, permissible_weights, car_length, self.particles, self.weights, update_times=5)
 
     self.state_lock.release()
 
@@ -394,22 +416,25 @@ if __name__ == '__main__':
   
   while not rospy.is_shutdown(): # Keep going until we kill it
     # Callbacks are running in separate threads
-    # if pf.global_localize: # no resample
-    #     temp = pf.N_VIZ_PARTICLES
-    #     pf.N_VIZ_PARTICLES = 100
-    #     pf.visualize()
-    #     rospy.sleep(1.0)
-    #     pf.initialize_global_loc2()
-    #     pf.N_VIZ_PARTICLES = temp
-    # elif pf.sensor_model.do_resample: # Check if the sensor model says it's time to resample
-    if pf.sensor_model.do_resample:
+    if pf.global_localize and pf.sensor_model.do_resample: # no resample
+        temp = pf.N_VIZ_PARTICLES
+        pf.N_VIZ_PARTICLES = 1000
+        pf.visualize()
+        rospy.sleep(1.0)
+        pf.initialize_global_loc2()
+        pf.N_VIZ_PARTICLES = temp
+        pf.sensor_model.do_resample = False
+
+    elif pf.sensor_model.do_resample: # Check if the sensor model says it's time to resample
+    # if pf.sensor_model.do_resample:
       pf.sensor_model.do_resample = False # Reset so that we don't keep resampling
       # Resample
       pf.resampler.resample_low_variance()
-
       pf.visualize() # Perform visualization
-    if pf.gl_sensor_model and pf.gl_sensor_model.alive:
-        pf.publish_particles(pf.gl_sensor_model.particles)
+    
+
+    # if pf.gl_sensor_model and pf.gl_sensor_model.alive:
+    #     pf.publish_particles(pf.gl_sensor_model.particles)
 
 
 

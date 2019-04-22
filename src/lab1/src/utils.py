@@ -156,7 +156,6 @@ def world_to_map(poses, map_info):
 
     # Scale
     poses[:,:2] *= (1.0/float(scale))
-
     # Rotation
     c, s = np.cos(angle), np.sin(angle)
     

@@ -39,7 +39,7 @@ class ReSampler:
     self.state_lock.acquire()
     
     #YOUR CODE HERE
-    print "let's resample ----------"
+    # print "let's resample ----------"
     
     if abs(self.weights.sum() - 1.0) > 1e-6:
         return
