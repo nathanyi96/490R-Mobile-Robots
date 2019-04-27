@@ -19,14 +19,14 @@ Z_SHORT = 0.1  # Weight for short reading
 Z_MAX = 0.05    # Weight for max reading
 Z_RAND = 0.05   # Weight for random reading
 SIGMA_HIT = 8.0 # Noise value for hit reading
-Z_HIT = 0.8    # Weight for hit reading
+Z_HIT = 0.80   # Weight for hit reading
 
 #Tune these Values!
-# Z_SHORT = 0.05  # Weight for short reading
+# Z_SHORT = 0.1  # Weight for short reading
 # Z_MAX = 0.05    # Weight for max reading
 # Z_RAND = 0.05   # Weight for random reading
-# SIGMA_HIT = 20.0 # Noise value for hit reading
-# Z_HIT = 0.85    # Weight for hit reading
+# SIGMA_HIT = 8.0 # Noise value for hit reading
+# Z_HIT = 0.8    # Weight for hit reading
 
 #Tune these Values!
 # Z_SHORT = 0.1  # Weight for short reading
@@ -39,7 +39,7 @@ Z_HIT = 0.8    # Weight for hit reading
 ''' 
   Weights particles according to their agreement with the observed data
 '''
-class SensorModel(object):
+class SensorModel:
 	
   '''
   Initializes the sensor model
@@ -79,8 +79,9 @@ class SensorModel(object):
     self.do_resample = False # Set so that outside code can know that it's time to resample
     
     # Subscribe to laser scans
-    self.laser_sub = rospy.Subscriber(scan_topic, LaserScan, self.lidar_cb, queue_size=1)    
-
+    self.laser_sub = rospy.Subscriber(scan_topic, LaserScan, self.lidar_cb, queue_size=1)
+    self.prev_weight = 1.0
+    self.confidence = 0.0
   '''
     Downsamples laser measurements and applies sensor model
       msg: A sensor_msgs/LaserScan
@@ -125,12 +126,16 @@ class SensorModel(object):
     obs = (np.copy(self.downsampled_ranges).astype(np.float32), self.downsampled_angles.astype(np.float32)) 
 
     self.apply_sensor_model(self.particles, obs, self.weights)
+    print 'sensor model stats', np.mean(self.weights), np.var(self.weights)
+    
+    # simple idea of comparing one sensor reading
+    curr_weight = np.mean(self.weights)
+    self.confidence = curr_weight / self.prev_weight
+    self.prev_weight = curr_weight
     self.weights /= np.sum(self.weights)
     
     self.last_laser = msg
     self.do_resample = True
-    #print 'Finished lidar cb'
-    print 'Finished lidar cb from', self.particles.shape
     self.state_lock.release()
     
   '''
