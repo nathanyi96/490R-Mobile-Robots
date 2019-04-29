@@ -1,7 +1,7 @@
 
 <launch>
     <param name="use_sim_time" value="true" />
-    <arg name="bagfile" default="full_2x.bag"/>
+    <arg name="bagfile" default="circle.bag"/>
     <arg name="plot" default="False"/>
     <arg name="path" default="$(env HOME)/490R_Projects/src/lab1/bags/real_floor4/"/>
     <arg name="gt_topic" default="/pf/ta/viz/inferred_pose"/>

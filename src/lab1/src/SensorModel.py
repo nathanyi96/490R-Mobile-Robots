@@ -10,6 +10,7 @@ import rosbag
 import matplotlib.pyplot as plt
 import utils as Utils
 from sensor_msgs.msg import LaserScan
+import Queue
 
 THETA_DISCRETIZATION = 112 # Discretization of scanning angle
 INV_SQUASH_FACTOR = 0.2    # Factor for helping the weight distribution to be less peaked
@@ -80,8 +81,21 @@ class SensorModel:
     
     # Subscribe to laser scans
     self.laser_sub = rospy.Subscriber(scan_topic, LaserScan, self.lidar_cb, queue_size=1)
-    self.prev_weight = 1.0
-    self.confidence = 0.0
+    #self.prev_weight = 1.0
+    self.do_confidence_update = False
+    self.CONF_HISTORY_SIZE = 10
+    self.conf_history = Queue.Queue()
+    self.conf_sum = 0.0
+    self.confidence = 1.0
+  
+
+  def reset_confidence(self):
+    self.do_confidence_update = False
+    self.conf_history = Queue.Queue()
+    self.conf_sum = 0.0
+    self.confidence = 1.0
+  
+
   '''
     Downsamples laser measurements and applies sensor model
       msg: A sensor_msgs/LaserScan
@@ -130,8 +144,19 @@ class SensorModel:
     
     # simple idea of comparing one sensor reading
     curr_weight = np.mean(self.weights)
-    self.confidence = curr_weight / self.prev_weight
-    self.prev_weight = curr_weight
+    # print 'scaled confidence:', (curr_weight*(2.0**ray_count))
+    if self.do_confidence_update:
+        self.conf_sum += curr_weight
+        self.conf_history.put(curr_weight)
+        if self.conf_history.qsize() > self.CONF_HISTORY_SIZE:
+            self.conf_sum -= self.conf_history.get()
+        if self.conf_history.qsize() == self.CONF_HISTORY_SIZE:
+            self.confidence = self.conf_sum / self.conf_history.qsize()
+        print 'confidence:', self.confidence
+    
+    #self.confidence = curr_weight / self.prev_weight
+    #self.prev_weight = curr_weight
+    
     self.weights /= np.sum(self.weights)
     
     self.last_laser = msg

@@ -87,8 +87,6 @@ class ParticleFilter():
     
     rospy.sleep(1.0)
     self.initialize_global()
-    
-
     self.resampler = ReSampler(self.particles, self.weights, self.state_lock)  # An object used for resampling
 
     # An object used for applying sensor model
@@ -105,9 +103,7 @@ class ParticleFilter():
     self.permissible_x, self.permissible_y = np.where(self.permissible_region == 1)
     
     # Parameters/flags/vars for global localization
-    self.global_localize = True     # True when doing global localization
-    #self.global_localize_cnt = 0    # 
-    self.global_localize = True
+    self.global_localize = False
     self.global_suspend = False
     self.ents = None
     self.ents_sum = 0.0
@@ -115,17 +111,16 @@ class ParticleFilter():
     self.NUM_REGIONS = 25  # number of regions to partition
     self.REGIONAL_ROUNDS = 5  # number of updates for regional localization
     self.regions = []
-    self.click_mode = False
+    self.click_mode = True
     self.debug_mode = False
-    self.kidnap_mode = True
-    self.kidnap = False
+    if self.debug_mode:
+        self.global_localize = True     # True when doing global localization
 
     # precompute regions. Each region is represented by arrays of x, y indices on the map
     region_size = len(self.permissible_x) / self.NUM_REGIONS
     # for i in xrange(self.NUM_REGIONS):  # row-major
     #   self.regions.append((self.permissible_x[i*region_size:(i+1)*region_size],
     #                        self.permissible_y[i*region_size:(i+1)*region_size]))
-    
     idx = np.argsort(self.permissible_y)  # column-major
     _px, _py = self.permissible_x[idx], self.permissible_y[idx]
     for i in xrange(self.NUM_REGIONS):
@@ -137,8 +132,6 @@ class ParticleFilter():
     # three different reactions to click on rviz
     self.click_sub  = rospy.Subscriber("/initialpose", PoseWithCovarianceStamped, self.clicked_pose_cb, queue_size=1)
     self.init_sub  = rospy.Subscriber("/initialpose", PoseWithCovarianceStamped, self.reinit_cb, queue_size=1)
-    self.kidnap_sub  = rospy.Subscriber("/initialpose", PoseWithCovarianceStamped, self.kidnap_cb, queue_size=1) # for testing kidnap
-    self.kidnap_pub = rospy.Publisher("/sim_car_pose/pose", PoseStamped, queue_size=1)
 
     rospy.wait_for_message(scan_topic, LaserScan)
     print('Initialization complete')
@@ -177,17 +170,6 @@ class ParticleFilter():
   def reinit_cb(self, msg):
     if self.debug_mode:
         self.global_localize = True
-
-  def kidnap_cb(self, msg):
-    if self.kidnap_mode:
-        self.state_lock.acquire()
-        pose = msg.pose.pose
-        print "SETTING KIDNAP POSE"
-        init_msg = PoseStamped()
-        init_msg.header = Utils.make_header("map")
-        init_msg.pose = pose
-        self.kidnap_pub.publish(init_msg) # simulates kidnapped
-        self.state_lock.release()
 
   def noisy_update(self):
     LOCATION_NOISE = 0.5
@@ -508,6 +490,8 @@ class ParticleFilter():
 
 
   def global_localization(self):
+    self.sensor_model.reset_confidence()
+
     candidate_num = self.particles.shape[0] / self.NUM_REGIONS
     regional_particles = []
     regional_weights = []
@@ -524,7 +508,7 @@ class ParticleFilter():
       self.state_lock.acquire()
       candidate_indices = np.argsort(self.weights)[-candidate_num:]
       candidates = self.particles[candidate_indices]
-      candidates_weights = self.weights[candidate_indices]
+      candidates_weights = self.weights[candidate_indices] 
       regional_particles.append(candidates.copy()) # save the particles
       regional_weights.append(candidates_weights)  # save the particles' weights
       self.state_lock.release()
@@ -536,6 +520,7 @@ class ParticleFilter():
     #self.weights[:] = 1.0 / self.particles.shape[0]
     self.global_localize = False
     self.global_suspend = True
+    self.sensor_model.do_confidence_update = True
     self.state_lock.release()
 
   def suspend_update(self):
@@ -582,10 +567,10 @@ if __name__ == '__main__':
   while not rospy.is_shutdown():  # Keep going until we kill it
     # Callbacks are running in separate threads
     
-    if pf.sensor_model.confidence < 1e-3 and not pf.global_localize:
-        print 'kidnapped'
+    if pf.sensor_model.confidence < 1e-20 and not pf.global_localize:
+        print '=================== KIDNAPPED ====================='
         pf.global_localize = True
-    
+
     # update particle filter
     if pf.global_localize: # no resample
         temp = pf.N_VIZ_PARTICLES
@@ -604,12 +589,11 @@ if __name__ == '__main__':
     #     pf.suspend_update()
     #     pf.visualize()
     #     pf.N_VIZ_PARTICLES = 60
+
     elif pf.sensor_model.do_resample: # Check if the sensor model says it's time to resample
       pf.sensor_model.do_resample = False # Reset so that we don't keep resampling
-      # Resample
       pf.resampler.resample_low_variance()
       pf.visualize() # Perform visualization
-    #pf.kidnap()
 
 
 
