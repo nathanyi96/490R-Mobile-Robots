@@ -20,7 +20,7 @@ class ReSampler:
     self.weights = weights
     
     # Indices for each of the M particles
-    self.particle_indices = np.arange(self.particles.shape[0])  
+    self.particle_indices = np.arange(self.particles.shape[0])
     
     # Bins for partitioning of weight values
     self.step_array = (1.0/self.particles.shape[0]) * np.arange(self.particles.shape[0], dtype=np.float32)
@@ -39,9 +39,11 @@ class ReSampler:
     self.state_lock.acquire()
     
     #YOUR CODE HERE
-    # print "let's resample ----------"
-    
+
+    # resolve issue of 0 weights in circle.bag
     if abs(self.weights.sum() - 1.0) > 1e-6:
+        self.weights.fill(1.0 / self.weights.shape[0])
+        self.state_lock.release()
         return
 
     M = self.particles.shape[0]
@@ -59,6 +61,5 @@ class ReSampler:
             cnt += 1
     self.particles[:] = particles[:]
     self.weights[:] = avg
-
     self.state_lock.release()
 

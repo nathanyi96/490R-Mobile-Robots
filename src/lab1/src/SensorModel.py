@@ -81,7 +81,8 @@ class SensorModel:
     
     # Subscribe to laser scans
     self.laser_sub = rospy.Subscriber(scan_topic, LaserScan, self.lidar_cb, queue_size=1)
-    #self.prev_weight = 1.0
+    
+    # FOR KIDNAPPED ROBOT PROBLEM
     self.do_confidence_update = False
     self.CONF_HISTORY_SIZE = 10
     self.conf_history = Queue.Queue()
@@ -140,11 +141,12 @@ class SensorModel:
     obs = (np.copy(self.downsampled_ranges).astype(np.float32), self.downsampled_angles.astype(np.float32)) 
 
     self.apply_sensor_model(self.particles, obs, self.weights)
-    print 'sensor model stats', np.mean(self.weights), np.var(self.weights)
+    # print 'sensor model stats', np.mean(self.weights), np.var(self.weights)
     
+
+    # FOR KIDNAPPED ROBOT PROBLEM
     # simple idea of comparing one sensor reading
     curr_weight = np.mean(self.weights)
-    # print 'scaled confidence:', (curr_weight*(2.0**ray_count))
     if self.do_confidence_update:
         self.conf_sum += curr_weight
         self.conf_history.put(curr_weight)
@@ -153,10 +155,7 @@ class SensorModel:
         if self.conf_history.qsize() == self.CONF_HISTORY_SIZE:
             self.confidence = self.conf_sum / self.conf_history.qsize()
         print 'confidence:', self.confidence
-    
-    #self.confidence = curr_weight / self.prev_weight
-    #self.prev_weight = curr_weight
-    
+
     self.weights /= np.sum(self.weights)
     
     self.last_laser = msg
