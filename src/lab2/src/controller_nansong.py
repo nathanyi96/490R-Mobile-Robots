@@ -7,6 +7,7 @@ class BaseController(object):
         self.path_lock = threading.RLock()
         self.path = np.array([])
         self._ready = False
+        self.B = 0.33 # car length
 
     def ready(self):
         '''
@@ -70,11 +71,13 @@ class BaseController(object):
         # compute the error vector. Be careful about the order
         # in which you subtract the car's pose from the
         # reference pose.
+        postion_ref = np.array(get_reference_pose(index)[0:2])
+        theta = pose[2]
+        R = np.array([[np.cos(theta), -np.sin(theta)],[np.sin(theta), np.cos(theta)]])
+        e_p = np.dot(R.T,(np.array(pose[0:2])-position_ref))
+        print("e_p", e_p)
+        return e_p
 
-        theta = np.radians(self.path[index][2])
-        cos, sin = np.cos(theta), np.sin(theta)
-        rot_mat = np.array([[cos, sin], [-sin, cos]])
-        x_y_err = np.array([pose[0] - self.path[index][0], pose[1] - self.path[index][1]])
-        e_p = np.dot(rot_mat, x_y_err)
+        '''
         print("e_p shape: " + e_p.shape()) # Make sure is 2 x 1 matrix
         return e_p

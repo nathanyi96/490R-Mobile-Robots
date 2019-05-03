@@ -35,7 +35,7 @@ class SafetyScan:
         ranges = ranges[np.where(~np.isnan(ranges))]
         ranges = ranges[ranges < msg.range_max]
         ranges = ranges[ranges > msg.range_min]
-        close = (ranges < 1.).sum()
+        close = (ranges < 0.5).sum()
         far = (ranges > 1.5).sum()
         print 'minimum scan: {}, {}'.format(ranges.min(), close)
         if close > 5: # threshold
@@ -43,8 +43,8 @@ class SafetyScan:
             print 'check collision'
             print rospy.Time.now()
             self.stop_flag = True
-        # elif far > 200:
-        #     self.stop_flag = False
+        elif far > 20:
+            self.stop_flag = False
 if __name__ == '__main__':
     rospy.init_node('scan', anonymous=True)
     s = SafetyScan()

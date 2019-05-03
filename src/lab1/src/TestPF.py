@@ -31,7 +31,7 @@ def callback(true_pose,pf_pose):
     pf_array.append([pf_pose.pose.position.x,pf_pose.pose.position.y])
 
     #Plot trajectories
-    if plot and time.time()-start_time > 15 and not plotted:
+    if plot and time.time()-start_time > 40 and not plotted:
         plt.xlabel('x')
         plt.ylabel('y')
         plt.plot(np.array(true_array)[:,0],np.array(true_array)[:,1],c='r')

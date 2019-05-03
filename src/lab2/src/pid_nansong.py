@@ -29,15 +29,13 @@ class PIDController(BaseController):
             #
             # Note: this method must be computationally efficient
             # as it is running directly in the tight control loop.
-
-            def find_distance(reference, pose):
-                return sqrt(((reference[0] - pose[0])**2) + ((reference[1] - pose[1])**2))  
-
-            eucl_dist_vect_func = np.vectorize(find_distance)
-            distances = eucl_dist_vect_func(self.path, pose)
-            return np.argmin(distances) + 1
-
-        
+            include_heading = False
+            if include_heading:
+                dist = np.sum((self.path[:,0:3] - pose[0:3])**2), axis=1)
+            else:
+                dist = np.sum((self.path[:,0:2] - pose[0:2])**2), axis=1)
+            # Find reference point with minimum, then return next point since robot may be ahead
+            return np.argmin(dist) + 2  ## +2 to make sure the ref is ahead of current pos
 
     def get_control(self, pose, index):
         '''
@@ -58,19 +56,16 @@ class PIDController(BaseController):
         #
         # First, compute the cross track error. Then, using known
         # gains, generate the control.
+        e_p = self.get_error(pose, index)
+        pose_ref = self.get_reference_pose(index)
+        e_theta = pose[2] - pose_ref[2]
+        V = pose_ref[3]
 
-        K_Proportional = 1.0
-        K_Derivative = 1.0
+        e_c = e_p[1] # cross error term
+        e_c_der = V*np.sin(e_theta) # error derivative term
 
-        theta_ref = self.path[index][2]
-        e_ct = -sin(theta_ref)*(pose[0]-self.path[index][0]) + cos(theta_ref)*(pose[1]-self.path[index][1])
-        velocity = self.path[3]
-        theta_err = pose[2] - theta_ref
-        e_ct_deriv = self.path[3]*sin(theta_err)
-        
-        steering_angle = K_Proportional*e_ct + K_Derivative*e_ct_deriv
-        
-        return np.array([velocity, steering_angle])
+        u_steering = self.kp * e_c + self.kd * e_c_der
+        return [V, u_steering]
 
     def reset_state(self):
         '''
@@ -89,5 +84,7 @@ class PIDController(BaseController):
             self.kp = float(rospy.get_param("/pid/kp", 0.15))
             self.kd = float(rospy.get_param("/pid/kd", 0.2))
             self.finish_threshold = float(rospy.get_param("/pid/finish_threshold", 0.2))
-            self.exceed_threshold  joseprrent reference pose to lookahed.
+            self.exceed_threshold = float(rospy.get_param("/pid/exceed_threshold", 4.0))
+            # Average distance from the current reference pose to lookahed.
+            # what does this waypoint_lookahead do? maybe useful in find reference point?
             self.waypoint_lookahead = float(rospy.get_param("/pid/waypoint_lookahead", 0.6))

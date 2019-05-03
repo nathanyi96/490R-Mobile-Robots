@@ -42,7 +42,7 @@ if __name__ == '__main__':
         init_msg.pose.pose.orientation = angle_to_quaternion(0.0)
     rospy.loginfo('Initial pose: \n' + str(init_msg))
     init_pub.publish(init_msg)
-    rate = rospy.Rate(23)
+    rate = rospy.Rate(15) # 30
 
     cnt = 0
     for msg in bag_data:

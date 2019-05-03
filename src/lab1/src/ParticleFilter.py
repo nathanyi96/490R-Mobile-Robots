@@ -19,7 +19,6 @@ import Queue
 from ReSample import ReSampler
 from SensorModel import SensorModel
 from MotionModel import  KinematicMotionModel
-from GlobalLocSensorModel import GlobalLocSensorModel
 
 MAP_TOPIC = "/map"
 PUBLISH_PREFIX = '/pf/viz'
@@ -109,8 +108,8 @@ class ParticleFilter():
     self.ents = None
     self.ents_sum = 0.0
     self.noisy_cnt = 0
-    self.NUM_REGIONS = 25     # number of regions to partition. Simulation: 25, Real: 5.
-    self.REGIONAL_ROUNDS = 5  # number of updates for regional localization. Simulation 5, Real: 3.
+    self.NUM_REGIONS = 5     # number of regions to partition. Simulation: 25, Real: 5.
+    self.REGIONAL_ROUNDS = 3  # number of updates for regional localization. Simulation 5, Real: 3.
     self.regions = []
     self.click_mode = True
     self.debug_mode = False

@@ -25,13 +25,15 @@ class PurePursuitController(BaseController):
             # handout for determining the reference index.
             #
             # Note: this method must be computationally efficient
-            # as it is running directly in the tight control loop. 
-            eucl_dist_vect_func = np.vectorize(self.find_distance)
-            distances = eucl_dist_vect_func(self.path, pose)
-            return np.argmin(distances) + 3
-
-    def find_distance(reference, pose):
-        return sqrt(((reference[0] - pose[0])**2) + ((reference[1] - pose[1])**2)) 
+            # as it is running directly in the tight control loop.
+            include_heading = False
+            if include_heading:
+                dist = np.sum((self.path[:,0:3] - pose[0:3])**2), axis=1)
+            else:
+                dist = np.sum((self.path[:,0:2] - pose[0:2])**2), axis=1)
+            dist = np.abs(dist - self.pose_lookahead)
+            indices = dist.argsort()[:-2][::-1]
+            return indices[1] if indices[1] > indices[0] else indices[0]
 
     def get_control(self, pose, index):
         '''
@@ -51,16 +53,14 @@ class PurePursuitController(BaseController):
         # Then, use the pure pursuit control method to compute the
         # steering angle. Refer to the hand out and referenced
         # articles for more details about this strategy.
+        pose_ref = get_reference_pose(index)
+        x_ref, y_ref, V_ref = pose_ref[0], pose_ref[1], pose_ref[3]
+        x, y = pose[0:2]
+        theta = pose[2]
+        alpha = np.arctan((y_ref-y)/(x_ref-x)) - theta
+        u_steering = np.arctan(2*self.B*np.sin(alpha)/self.pose_lookahead)
 
-        index = self.get_reference_index(pose)
-        L = self.find_distance(self.path[index], pose) # Use "dynamic" L value instead? Just an idea.
-        B = 1.5 # Arbitrary dummy value. Need to make actual measurements.
-        a = np.arctan((self.path[index][1]-pose[1]) / (self.path[index][0]-pose[0])) - pose[2] # Correct theta for last term?
-
-        velocity = self.path[index][3]
-        steering_angle = np.arctan(2*B*np.sin(a) / L)
-
-        return np.array([velocity, steering_angle])
+        return [V_ref, u_steering]
 
     def reset_state(self):
         '''
@@ -75,6 +75,7 @@ class PurePursuitController(BaseController):
             testing.
         '''
         with self.path_lock:
+            # what does self.speed use for? should we get V_ref from reference pose or here?
             self.speed = float(rospy.get_param("/pid/speed", 1.0))
             self.finish_threshold = float(rospy.get_param("/pid/finish_threshold", 0.2))
             self.exceed_threshold = float(rospy.get_param("/pid/exceed_threshold", 4.0))
