@@ -9,7 +9,8 @@ class PurePursuitController(BaseController):
 
         self.reset_params()
         self.reset_state()
-
+        self.last_index = 0
+        self.L = 2
     def get_reference_index(self, pose):
         '''
         get_reference_index finds the index i in the controller's path
@@ -25,13 +26,26 @@ class PurePursuitController(BaseController):
             # handout for determining the reference index.
             #
             # Note: this method must be computationally efficient
-            # as it is running directly in the tight control loop. 
-            eucl_dist_vect_func = np.vectorize(self.find_distance)
-            distances = eucl_dist_vect_func(self.path, pose)
-            return np.argmin(distances) + 3
+            # as it is running directly in the tight control loop.
 
-    def find_distance(reference, pose):
-        return sqrt(((reference[0] - pose[0])**2) + ((reference[1] - pose[1])**2)) 
+            # dist = np.sqrt(np.sum(((self.path[:,0:2] - pose[0:2])**2), axis=1))
+            # # Find reference point with minimum, then return next point since robot may be ahead
+            # return (np.argmin(dist) + 1)  # +1 to make sure ref is ahead of current pos
+
+            include_heading = False
+            if include_heading:
+                dist = np.sum((self.path[:,0:3] - pose[0:3])**2, axis=1)
+            else:
+                dist = np.sum((self.path[:,0:2] - pose[0:2])**2, axis=1)
+            dist = np.sqrt(dist)
+            print("range: ", np.min(dist),"-", np.max(dist))
+            closest = np.abs(dist - self.L)
+            indices = closest.argsort()[:-2][::-1]
+
+            dist = np.sqrt(np.sum(((self.path[:,0:2] - pose[0:2])**2), axis=1))
+            index = np.argmin(dist) + 3
+            #return indices[1] if indices[1] > indices[0] else indices[0]
+            return index
 
     def get_control(self, pose, index):
         '''
@@ -52,15 +66,42 @@ class PurePursuitController(BaseController):
         # steering angle. Refer to the hand out and referenced
         # articles for more details about this strategy.
 
-        index = self.get_reference_index(pose)
-        L = self.find_distance(self.path[index], pose) # Use "dynamic" L value instead? Just an idea.
-        B = 1.5 # Arbitrary dummy value. Need to make actual measurements.
-        a = np.arctan((self.path[index][1]-pose[1]) / (self.path[index][0]-pose[0])) - pose[2] # Correct theta for last term?
+        # index = self.get_reference_index(pose)
+        # L = self.find_distance(self.path[index], pose) # Use "dynamic" L value instead? Just an idea.
+        # B = 1.5 # Arbitrary dummy value. Need to make actual measurements.
+        # a = np.arctan((self.path[index][1]-pose[1]) / (self.path[index][0]-pose[0])) - pose[2] # Correct theta for last term?
 
-        velocity = self.path[index][3]
-        steering_angle = np.arctan(2*B*np.sin(a) / L)
+        # velocity = self.path[index][3]
+        # steering_angle = np.arctan(2*B*np.sin(a) / L)
 
-        return np.array([velocity, steering_angle])
+        # return np.array([velocity, steering_angle])
+
+        pose_ref = self.get_reference_pose(index)
+        x_ref, y_ref, V_ref = pose_ref[0], pose_ref[1], pose_ref[3]
+        x, y = pose[0:2]
+        theta = pose[2]
+
+        alpha = np.arctan2((y_ref-y), (x_ref-x)) - theta
+        alpha = self.minimized_angle(alpha)
+        self.L = np.sqrt((x-x_ref)**2+(y-y_ref)**2)
+        u_steering = np.arctan(2*self.B*np.sin(alpha)/self.L)
+
+        return [V_ref, u_steering]
+
+    def angle_limit(self, theta):
+        if theta > np.pi:
+            theta -= np.pi
+        elif theta < -np.pi:
+            theta += np.pi
+        return theta
+
+    def minimized_angle(self, angle):
+        """Normalize an angle to [-pi, pi]."""
+        while angle < -np.pi:
+            angle += 2 * np.pi
+        while angle >= np.pi:
+            angle -= 2 * np.pi
+        return angle
 
     def reset_state(self):
         '''

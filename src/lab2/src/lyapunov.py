@@ -4,9 +4,9 @@ import rospy
 from controller import BaseController
 
 
-class PIDController(BaseController):
+class LyapunovController(BaseController):
     def __init__(self):
-        super(PIDController, self).__init__()
+        super(LyapunovController, self).__init__()
 
         self.reset_params()
         self.reset_state()
@@ -29,15 +29,7 @@ class PIDController(BaseController):
             #
             # Note: this method must be computationally efficient
             # as it is running directly in the tight control loop.
-
-            # include_heading = False
-            # if include_heading:
-            #     dist = np.sum(((self.path[:,0:3] - pose[0:3])**2), axis=1)
-            # else:
-            dist = np.sqrt(np.sum(((self.path[:,0:2] - pose[0:2])**2), axis=1))
-            # Find reference point with minimum, then return next point since robot may be ahead
-            return (np.argmin(dist) + 1)  # +2 to make sure ref is ahead of current pos
-
+            assert False, "Complete this function"
 
     def get_control(self, pose, index):
         '''
@@ -58,21 +50,7 @@ class PIDController(BaseController):
         #
         # First, compute the cross track error. Then, using known
         # gains, generate the control.
-
-
-        # print 'pid called'
-        K_Proportional = self.kp * 10
-        K_Derivative = self.kd * 5
-
-        pose_ref = self.get_reference_pose(index)
-        velocity = pose_ref[3]
-        theta_err = pose[2] - pose_ref[2]
-        e_ct = self.get_error(pose, index)[1]
-        e_ct_deriv = velocity * np.sin(theta_err)
-
-        steering_angle = K_Proportional*e_ct + K_Derivative*e_ct_deriv
-
-        return np.array([velocity, -steering_angle])
+        assert False, "Complete this function"
 
     def reset_state(self):
         '''
@@ -87,9 +65,8 @@ class PIDController(BaseController):
             server. Setting parameters, such as gains, can be useful for interative
             testing.
         '''
-        with self.path_lock:
-            self.kp = float(rospy.get_param("/pid/kp", 0.15))
-            self.kd = float(rospy.get_param("/pid/kd", 0.2))
+        # with self.path_lock:
             self.finish_threshold = float(rospy.get_param("/pid/finish_threshold", 0.2))
             self.exceed_threshold = float(rospy.get_param("/pid/exceed_threshold", 4.0))
+            # Average distance from the current reference pose to lookahed.
             self.waypoint_lookahead = float(rospy.get_param("/pid/waypoint_lookahead", 0.6))

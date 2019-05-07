@@ -49,6 +49,7 @@ class ControlNode:
             self.path_event.wait()
             self.reset_lock.acquire()
             ip = self.inferred_pose
+            # print '>>>>>>>', self.controller.ready(),ip is not None
             if ip is not None and self.controller.ready():
                 index = self.controller.get_reference_index(ip)
                 pose = self.controller.get_reference_pose(index)
@@ -71,7 +72,7 @@ class ControlNode:
         exit(0)
 
     def load_controller(self):
-        self.controller_type = rospy.get_param("/controller/type", default="PID")
+        self.controller_type = rospy.get_param("/controller/type", default="PP")
         self.controller = controllers[self.controller_type]()
 
     def setup_pub_sub(self):
@@ -86,13 +87,8 @@ class ControlNode:
 
         rospy.Service("/controller/follow_path", FollowPath, self.cb_path)
 
-        if rospy.get_param("~use_sim_pose", default=False):
-            rospy.Subscriber("/sim_car_pose/pose",
+        rospy.Subscriber(rospy.get_param("~pose_topic", "/sim_car_pose/pose"),
                              PoseStamped, self.cb_pose, queue_size=10)
-
-        if rospy.get_param("~use_odom_pose", default=True):
-            rospy.Subscriber("/odom",
-                             Odometry, self.cb_odom, queue_size=10)
 
         self.rp_ctrls = rospy.Publisher(
             rospy.get_param(

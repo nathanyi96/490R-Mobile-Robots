@@ -7,6 +7,7 @@ class BaseController(object):
         self.path_lock = threading.RLock()
         self.path = np.array([])
         self._ready = False
+        self.B = 0.33 # car length
 
     def ready(self):
         '''
@@ -71,10 +72,10 @@ class BaseController(object):
         # in which you subtract the car's pose from the
         # reference pose.
 
-        theta = np.radians(self.path[index][2])
+        pose_ref = self.get_reference_pose(index)
+        theta = pose_ref[2]
         cos, sin = np.cos(theta), np.sin(theta)
         rot_mat = np.array([[cos, sin], [-sin, cos]])
-        x_y_err = np.array([pose[0] - self.path[index][0], pose[1] - self.path[index][1]])
+        x_y_err = np.array([pose[0] - pose_ref[0], pose[1] - pose_ref[1]])
         e_p = np.dot(rot_mat, x_y_err)
-        print("e_p shape: " + e_p.shape()) # Make sure is 2 x 1 matrix
         return e_p

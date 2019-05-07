@@ -97,3 +97,4 @@ if __name__ == '__main__':
     controller = rospy.ServiceProxy("/controller/follow_path", FollowPath())
     success = controller(path)
     print "Controller started."
+ 

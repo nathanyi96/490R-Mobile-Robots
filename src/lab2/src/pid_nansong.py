@@ -31,9 +31,9 @@ class PIDController(BaseController):
             # as it is running directly in the tight control loop.
             include_heading = False
             if include_heading:
-                dist = np.sum((self.path[:,0:3] - pose[0:3])**2), axis=1)
+                dist = np.sum(((self.path[:,0:3] - pose[0:3])**2), axis=1)
             else:
-                dist = np.sum((self.path[:,0:2] - pose[0:2])**2), axis=1)
+                dist = np.sum(((self.path[:,0:2] - pose[0:2])**2), axis=1)
             # Find reference point with minimum, then return next point since robot may be ahead
             return np.argmin(dist) + 2  ## +2 to make sure the ref is ahead of current pos
 
