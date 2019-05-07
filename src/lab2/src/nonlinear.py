@@ -10,16 +10,44 @@ class NonLinearController(BaseController):
     def __init__(self):
         super(NonLinearController, self).__init__()
 
+        self.reset_params()
+        self.reset_state()
+
     def get_reference_index(self, pose):
-        assert False, "Complete this function"
+        dist = np.sqrt(np.sum(((self.path[:,0:2] - pose[0:2])**2), axis=1))
+        return (np.argmin(dist) + 2)
 
     def get_control(self, pose, index):
-        assert False, "Complete this function"
+        pose_ref = self.get_reference_pose(index)
+
+        k_1 = self.k1
+        k_2 = self.k2
+        length = self.B
+        velocity = pose_ref[3]
+        e_ct = self.get_error(pose, index)[1]
+
+        theta_err = pose[2] - pose_ref[2]
+        theta_err = self.minimized_angle(theta_err)
+
+        y = -k_1 * e_ct * velocity * np.sin(theta_err) - k_2 * theta_err**2
+        x = theta_err * velocity / self.B
+
+        # steering_angle = np.arctan2(y, x)
+        # steering_angle = self.minimized_angle(steering_angle)
+
+        steering_angle = np.arctan(y/x)
+        # steering_angle = self.minimized_angle(steering_angle)
+
+        return np.array([velocity, steering_angle])
+
 
     def reset_state(self):
         with self.path_lock:
-            assert False, "Complete this function"
+            pass
 
     def reset_params(self):
         with self.path_lock:
-            assert False, "Complete this function"
+            self.k1 = float(rospy.get_param("/lyapunov/k1", 1.5))
+            self.k2 = float(rospy.get_param("/lyapunov/k2", 1.5))
+            self.finish_threshold = float(rospy.get_param("/lyapunov/finish_threshold", 0.2))
+            self.exceed_threshold = float(rospy.get_param("/lyapunov/exceed_threshold", 4.0))

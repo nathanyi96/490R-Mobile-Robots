@@ -95,14 +95,6 @@ class PurePursuitController(BaseController):
             theta += np.pi
         return theta
 
-    def minimized_angle(self, angle):
-        """Normalize an angle to [-pi, pi]."""
-        while angle < -np.pi:
-            angle += 2 * np.pi
-        while angle >= np.pi:
-            angle -= 2 * np.pi
-        return angle
-
     def reset_state(self):
         '''
         Utility function for resetting internal states.

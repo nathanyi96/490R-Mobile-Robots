@@ -66,7 +66,9 @@ class PIDController(BaseController):
 
         pose_ref = self.get_reference_pose(index)
         velocity = pose_ref[3]
+        
         theta_err = pose[2] - pose_ref[2]
+
         e_ct = self.get_error(pose, index)[1]
         e_ct_deriv = velocity * np.sin(theta_err)
 

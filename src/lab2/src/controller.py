@@ -79,3 +79,11 @@ class BaseController(object):
         x_y_err = np.array([pose[0] - pose_ref[0], pose[1] - pose_ref[1]])
         e_p = np.dot(rot_mat, x_y_err)
         return e_p
+
+    def minimized_angle(self, angle):
+        """Normalize an angle to [-pi, pi]."""
+        while angle < -np.pi:
+            angle += 2 * np.pi
+        while angle >= np.pi:
+            angle -= 2 * np.pi
+        return angle
