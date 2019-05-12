@@ -53,7 +53,7 @@ class PIDController(BaseController):
         # Compute the next control using the PD control strategy.
         # Consult the project report for details on how PD control
         # works.
-        #
+
         # First, compute the cross track error. Then, using known
         # gains, generate the control.
         e_p = self.get_error(pose, index)
@@ -63,7 +63,6 @@ class PIDController(BaseController):
 
         e_c = e_p[1] # cross error term
         e_c_der = V*np.sin(e_theta) # error derivative term
-
         u_steering = self.kp * e_c + self.kd * e_c_der
         return [V, u_steering]
 

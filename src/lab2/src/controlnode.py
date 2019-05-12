@@ -72,7 +72,7 @@ class ControlNode:
         exit(0)
 
     def load_controller(self):
-        self.controller_type = rospy.get_param("/controller/type", default="NL")
+        self.controller_type = rospy.get_param("/controller/type", default="PID")
         self.controller = controllers[self.controller_type]()
 
     def setup_pub_sub(self):

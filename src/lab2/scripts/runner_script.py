@@ -59,9 +59,14 @@ def cse022_path():
         p = pickle.load(f)
     return p
 
+def single():
+    poses = [[x, 0, 0] for x in xrange(10)]
+    print poses
+    return poses
 
-plans = {'circle': circle, 'left turn': left_turn, 'right turn': right_turn, 'saw': saw, 'cse022 real path': cse022_path}
-plan_names = ['circle', 'left turn', 'right turn', 'saw', 'cse022 real path']
+
+plans = {'circle': circle, 'left turn': left_turn, 'right turn': right_turn, 'saw': saw, 'cse022 real path': cse022_path, 'single pose': single}
+plan_names = ['circle', 'left turn', 'right turn', 'saw', 'cse022 real path', 'single pose']
 
 
 def generate_plan():
@@ -90,6 +95,7 @@ if __name__ == '__main__':
         ramp_down = np.linspace(desired_speed, 0.3, int(ramp_percent * len(configs)))
         speeds = np.zeros(len(configs))
         speeds[:] = desired_speed
+        print len(configs)
         speeds[0:len(ramp_up)] = ramp_up
         speeds[-len(ramp_down):] = ramp_down
         path = XYHVPath(h, [XYHV(*[config[0], config[1], config[2], speed]) for config, speed in zip(configs, speeds)])

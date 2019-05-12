@@ -10,7 +10,6 @@ class PurePursuitController(BaseController):
         self.reset_params()
         self.reset_state()
         self.last_index = 0
-        self.L = 2
     def get_reference_index(self, pose):
         '''
         get_reference_index finds the index i in the controller's path
@@ -32,20 +31,25 @@ class PurePursuitController(BaseController):
             # # Find reference point with minimum, then return next point since robot may be ahead
             # return (np.argmin(dist) + 1)  # +1 to make sure ref is ahead of current pos
 
-            include_heading = False
-            if include_heading:
-                dist = np.sum((self.path[:,0:3] - pose[0:3])**2, axis=1)
-            else:
-                dist = np.sum((self.path[:,0:2] - pose[0:2])**2, axis=1)
+            dist = np.sum((self.path[:,0:2] - pose[0:2])**2, axis=1)
             dist = np.sqrt(dist)
-            print("range: ", np.min(dist),"-", np.max(dist))
-            closest = np.abs(dist - self.L)
-            indices = closest.argsort()[:-2][::-1]
+            #print("range: ", np.min(dist),"-", np.max(dist))
+            argm = np.argmin(dist)
+            print "min dist = ref[", argm, "] =", dist[argm]
+            closest = np.abs(dist[argm:] - self.pose_lookahead)
+            # closest = np.abs(dist - self.pose_lookahead)
+            # idx = np.max(closest.argsort()[:4])
+            #print "L idx", indices[:10] + argmarctan
+            #print "L dist", closest[indices[:10]]
+            idx = np.argmin(closest) + argm
+            # print "idx chosen:", idx, "dist:", dist[idx]
 
-            dist = np.sqrt(np.sum(((self.path[:,0:2] - pose[0:2])**2), axis=1))
-            index = np.argmin(dist) + 3
-            #return indices[1] if indices[1] > indices[0] else indices[0]
-            return index
+            return idx
+
+            #dist = np.sqrt(np.sum(((self.path[:,0:2] - pose[0:2])**2), axis=1))
+            #index = np.argmin(dist) + 3
+            #return index
+            #return (indices[1] if indices[1] > indices[0] else indices[0])
 
     def get_control(self, pose, index):
         '''
@@ -78,22 +82,14 @@ class PurePursuitController(BaseController):
 
         pose_ref = self.get_reference_pose(index)
         x_ref, y_ref, V_ref = pose_ref[0], pose_ref[1], pose_ref[3]
-        x, y = pose[0:2]
-        theta = pose[2]
+        x, y, theta = pose
 
         alpha = np.arctan2((y_ref-y), (x_ref-x)) - theta
-        alpha = self.minimized_angle(alpha)
-        self.L = np.sqrt((x-x_ref)**2+(y-y_ref)**2)
-        u_steering = np.arctan(2*self.B*np.sin(alpha)/self.L)
-
+        # alpha = self.minimized_angle(alpha)
+        L = np.sqrt((x-x_ref)**2+(y-y_ref)**2)
+        u_steering = np.arctan(2*self.B*np.sin(alpha)/L)
+        # print "L =", L, "L_ref =", self.pose_lookahead
         return [V_ref, u_steering]
-
-    def angle_limit(self, theta):
-        if theta > np.pi:
-            theta -= np.pi
-        elif theta < -np.pi:
-            theta += np.pi
-        return theta
 
     def reset_state(self):
         '''
@@ -114,4 +110,5 @@ class PurePursuitController(BaseController):
             # Lookahead distance from current pose to next waypoint. Different from
             # waypoint_lookahead in the other controllers, as those are distance from
             # the reference point.
-            self.pose_lookahead = float(rospy.get_param("/purepursuit/pose_lookahead", 0.6))
+            self.pose_lookahead = float(rospy.get_param("/purepursuit/pose_lookahead", 1.0))
+            print "set pose_lookahead to", self.pose_lookahead

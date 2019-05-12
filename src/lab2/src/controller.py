@@ -81,7 +81,7 @@ class BaseController(object):
         return e_p
 
     def minimized_angle(self, angle):
-        """Normalize an angle to [-pi, pi]."""
+        """Normalize an angle to [-pi, pi)."""
         while angle < -np.pi:
             angle += 2 * np.pi
         while angle >= np.pi:
