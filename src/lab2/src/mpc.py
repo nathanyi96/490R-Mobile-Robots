@@ -7,18 +7,27 @@ from controller import BaseController
 from nav_msgs.srv import GetMap
 
 import time
+import matplotlib.pyplot as plt
+import matplotlib.path as mpath
+import matplotlib.patches as mpatches
 from scipy.spatial.distance import directed_hausdorff
 from scipy.stats import truncnorm
+from nav_msgs.msg import Path
+from geometry_msgs.msg import Pose, PoseStamped, PoseArray
+from std_msgs.msg import Header
 from sensor_msgs.msg import LaserScan
 SCAN_TOPIC = "" # Laser scan topic
 
 class ModelPredictiveController(BaseController):
     def __init__(self):
         super(ModelPredictiveController, self).__init__()
+        self.traj_pub = rospy.Publisher("/mpc/traj", Path, queue_size=10)
 
         self.reset_params()
         self.reset_state()
 
+        rospy.loginfo('plotting traj lib')
+        self.visualize_traj()
         self.obs = None
         #self.laser_sub = rospy.Subscriber(SCAN_TOPIC, LaserScan, self.lidar_cb, queue_size=1) # Callback at end of this file
 
@@ -38,12 +47,18 @@ class ModelPredictiveController(BaseController):
             # point and chose the next point some distance away along
             # the path. You are welcome to use the same method for MPC
             # as you used for PID or Pure Pursuit.
-            #
-                # Note: this method must be computationally efficient
-            # as it is running directly in the tight control loop.
+            
+            # dist = np.sum((self.path[:,0:2] - pose[0:2])**2, axis=1)
+            # dist = np.sqrt(dist)
+            # argm = np.argmin(dist)
+            # #print "min dist = ref[", argm, "] =", dist[argm]
+            # closest = np.abs(dist[argm:] - self.waypoint_lookahead)
+            # idx = np.argmin(closest) + argm
+            # return idx
             dist = np.sqrt(np.sum(((self.path[:,0:2] - pose[0:2])**2), axis=1))
             idx = np.argmin(dist)
-            return (idx if (idx == len(self.path)- 1) else idx+1)
+            return (idx if (idx == len(self.path)-1) else idx+1)
+
 
     def get_control(self, pose, index):
         '''
@@ -79,7 +94,7 @@ class ModelPredictiveController(BaseController):
 
         # Then step forward the K control trajectory T timesteps using
         # self.apply_kinematics
-        for i in xrange(1, self.T):              
+        for i in xrange(1, self.T):
             rollouts[:,i,:] = np.array(self.apply_kinematics(rollouts[:,i-1,:], self.trajs[:,i-1,:])).T # ...(positions, controls)
 
         # Apply the cost function to the rolled out poses.
@@ -92,6 +107,8 @@ class ModelPredictiveController(BaseController):
 
         # Return the controls which yielded the min cost.
         print self.trajs[min_control][0]
+        rospy.loginfo(str(rollouts[min_control]))
+        self.visualize_selected_traj(rollouts[min_control])
         return self.trajs[min_control][0]
 
     def reset_state(self):
@@ -99,7 +116,7 @@ class ModelPredictiveController(BaseController):
         Utility function for resetting internal states.
         '''
         with self.path_lock:
-            self.trajs = self.get_control_trajectories()
+            self.trajs = self.get_control_trajectories2()
             assert self.trajs.shape == (self.K, self.T, 2)
             self.scaled = np.zeros((self.K * self.T, 3))
             self.bbox_map = np.zeros((self.K * self.T, 2, 4))
@@ -124,18 +141,22 @@ class ModelPredictiveController(BaseController):
             self.max_delta = float(rospy.get_param("trajgen/max_delta", 0.34))
 
             self.K = int(rospy.get_param("mpc/K", 62))
-            self.T = int(rospy.get_param("mpc/T", 4))
+            self.T = int(rospy.get_param("mpc/T", 3))
 
             self.speed = float(rospy.get_param("mpc/speed", 1.0))
             self.finish_threshold = float(rospy.get_param("mpc/finish_threshold", 1.0))
-            self.exceed_threshold = float(rospy.get_param("mpc/exceed_threshold", 4.0))
+            self.exceed_threshold = float(rospy.get_param("mpc/exceed_threshold", 100.0))
             # Average distance from the current reference pose to lookahed.
-            self.waypoint_lookahead = float(rospy.get_param("mpc/waypoint_lookahead", 1.0))
+            self.waypoint_lookahead = float(rospy.get_param("mpc/waypoint_lookahead", 1.5))
             self.collision_w = float(rospy.get_param("mpc/collision_w", 1e5))
             self.error_w = float(rospy.get_param("mpc/error_w", 1.0))
 
             self.car_length = float(rospy.get_param("mpc/car_length", 0.33))
             self.car_width = float(rospy.get_param("mpc/car_width", 0.15))
+
+            # custom parameters
+            self.dt = float(rospy.get_param("mpc/dt", 0.2))
+            self.shape_w = float(rospy.get_param("mpc/shape_w", 1.0))
 
     def get_control_trajectories(self):
         '''
@@ -157,13 +178,33 @@ class ModelPredictiveController(BaseController):
         ctrls = np.zeros((self.K, self.T, 2))
         # step_size = (self.max_delta - self.min_delta) / (self.K - 1)
 
-        #sd = 0.1
-        #mean = 0
-        #lb, ub = (self.min_delta - mean) / sd, (self.max_delta - mean) / sd
-        #tnormal = truncnorm(lb, ub, loc=mean, scale=sd)
-        #for i in xrange(self.T):
-            #ctrls[:,i,1] = tnormal.rvs(size=self.K)  # sample from control space with truncated gaussian
+        sd = 0.8
+        mean = 0
+        lb, ub = (self.min_delta - mean) / sd, (self.max_delta - mean) / sd
+        tnormal = truncnorm(lb, ub, loc=mean, scale=sd)
+        for i in xrange(self.T):
+            ctrls[:,i,1] = tnormal.rvs(size=self.K)  # sample from control space with truncated gaussian
+        ctrls[0,:,1] = np.zeros(self.T)
+        return ctrls
 
+    def get_control_trajectories2(self):
+        '''
+        get_control_trajectories computes K control trajectories to be
+            rolled out on each update step. You should only execute this
+            function when initializing the state of the controller.
+
+            various methods can be used for generating a sufficient set
+            of control trajectories, but we suggest stepping over the
+            control space (of steering angles) to create the initial
+            set of control trajectories.
+        output:
+            ctrls - a (K x T x 2) vector which lists K control trajectories
+                of length T
+        '''
+        # TODO: INSERT CODE HERE
+        # Create a trajectory library of K trajectories for T timesteps to
+        # roll out when computing the best control.
+        ctrls = np.zeros((self.K, self.T, 2))
 
         time_start = time.time()
         # generate dense set of paths D
@@ -213,8 +254,10 @@ class ModelPredictiveController(BaseController):
                         if (path, path_S) in dcache:
                             dist = dcache[(path, path_S)]
                         else:
-                            p1 = np.concatenate((D[path,:].reshape(self.T, 1), np.zeros((self.T, 1))), axis=1)
-                            p2 = np.concatenate((D[path_S,:].reshape(self.T, 1), np.zeros((self.T, 1))), axis=1)
+                            p1 = D[[path]]
+                            p2 = D[[path_S]]
+                            # p1 = np.concatenate((D[path,:].reshape(self.T, 1), np.zeros((self.T, 1))), axis=1)
+                            # p2 = np.concatenate((D[path_S,:].reshape(self.T, 1), np.zeros((self.T, 1))), axis=1)
                             dist = max(directed_hausdorff(p1, p2)[0], directed_hausdorff(p2, p1)[0])
                             dcache[(path, path_S)] = dist
                         min_dist = min(min_dist, dist)
@@ -231,7 +274,7 @@ class ModelPredictiveController(BaseController):
         cnt = 0
         for path in S:
             ctrls[cnt,:,1] = D[path,:]
-
+            cnt += 1
         rospy.loginfo('traj selection time:' + str(time.time()-time_start))
         return ctrls
 
@@ -261,10 +304,14 @@ class ModelPredictiveController(BaseController):
         velocity = control[:,0]
         delta = control[:,1]
 
-        dt = 0.1
-        theta_dot = theta + (velocity / self.B * np.tan(delta)) * dt
+        theta_dot = theta + (velocity / self.B * np.tan(delta)) * self.dt
         x_dot = x + (self.B / (np.tan(delta)+1e-12) * (np.sin(theta_dot) - np.sin(theta))) 
         y_dot = y + (self.B / (np.tan(delta)+1e-12) * (-np.cos(theta_dot) + np.cos(theta)))
+        straight_idx = (np.absolute(delta) < 1e-8)
+        x_dot[straight_idx] = x[straight_idx] + ((np.cos(theta))[straight_idx])*velocity[straight_idx]*self.dt
+        y_dot[straight_idx] = y[straight_idx] + ((np.sin(theta))[straight_idx])*velocity[straight_idx]*self.dt
+
+
         
         return (x_dot, y_dot, theta_dot)
 
@@ -278,9 +325,22 @@ class ModelPredictiveController(BaseController):
         collisions = self.check_collisions_in_map(all_poses)
         collisions.resize(self.K, self.T)
         collision_cost = collisions.sum(axis=1) * self.collision_w
+        # compute shape costs
+        pose_ref = self.get_reference_pose(index)
+        path_dist = self.dt * pose_ref[3] * self.T
+        end_idx, d = index + 1, 0.0
+        while end_idx < self.path.shape[0] and d < path_dist:
+            d += np.linalg.norm(self.path[end_idx,:2]-self.path[end_idx-1,:2])
+            end_idx += 1
+        ref_path = self.path[index:end_idx,:2]
+        shape_cost = np.empty(self.K)
+        for i in xrange(self.K):
+            prop_path = poses[i,:,:2]
+            shape_cost[i] = max(directed_hausdorff(ref_path, prop_path)[0], directed_hausdorff(prop_path, ref_path)[0])
+        shape_cost *= self.shape_w
         error_cost = np.linalg.norm(poses[:, self.T - 1, :2] - self.path[index, :2], axis=1) * self.error_w
 
-        return collision_cost + error_cost
+        return collision_cost + error_cost + shape_cost
 
     def check_collisions_in_map(self, poses):
         '''
@@ -387,8 +447,111 @@ class ModelPredictiveController(BaseController):
         out[:, 1] = self.map_s * temp + self.map_c * out[:, 1]
         out[:, 2] += self.map_angle
 
-    def visulize_traj():
-        pass
+    def visualize_selected_traj(self, poses):
+        #rospy.loginfo("poses length" + str(poses.shape))
+        path_poses = []
+        assert self.T == poses.shape[0]
+        time_now = rospy.Time.now()
+        for i in xrange(self.T):
+            pose = PoseStamped()
+            #pose.header = Header()
+            #pose.header.stamp = time_now
+            #pose.header.frame_id = "map"
+            pose.pose.position.x = poses[i,0]
+            pose.pose.position.y = poses[i,1]
+            pose.pose.position.z = 0
+            pose.pose.orientation = utils.angle_to_rosquaternion(poses[i,2])
+            path_poses.append(pose)
+        path = Path()
+        path.header = Header()
+        path.header.stamp = time_now
+        path.header.frame_id = "map"
+        path.poses = path_poses
+        self.traj_pub.publish(path)
+
+    def visualize_traj(self):  # must be called after get_control_trajectories()
+        fig, ax = plt.subplots()
+        rollouts = np.zeros((self.K, self.T, 3))
+        rollouts[:,0,0] = 0
+        rollouts[:,0,1] = 0
+        rollouts[:,0,2] = np.pi/2
+        self.trajs[:,:,0] = 2.0
+        for i in xrange(1, self.T):              
+            rollouts[:,i,:] = np.array(self.apply_kinematics(rollouts[:,i-1,:], self.trajs[:,i-1,:])).T
+        for i in xrange(self.K):
+            self.plot_path(ax, rollouts[i])
+        plt.show()
+
+    def plot_path(self, ax, poses):
+        '''
+        poses: (T x 3) ndarray, where each pose is (x, y, theta), theta in [-pi, pi]
+        '''
+        Path = mpath.Path
+
+        for i in xrange(poses.shape[0]):
+          ax.arrow(poses[i,0], poses[i,1], 0.05*np.cos(poses[i,2]), 0.05*np.sin(poses[i,2]), width=0.003)
+
+        path_verts = [poses[0,:2]]
+        path_codes = [Path.MOVETO]
+        for i in xrange(1, poses.shape[0]):
+          heading_diff = abs(poses[i-1,2] - poses[i,2])
+          if heading_diff < 1e-8 or abs(heading_diff-2*np.pi) < 1e-8:
+            path_verts.append(poses[i,:2])
+            path_codes.append(Path.LINETO)
+          else:
+            ct1, ct2 = self.get_control_points(poses[i-1], poses[i])
+            path_verts.extend((ct1, ct2, poses[i,:2]))
+            path_codes.extend((Path.CURVE4,)*3)
+        #return path_verts, path_codes
+        pp1 = mpatches.PathPatch(
+          Path(path_verts,
+               path_codes),
+          fc="none", transform=ax.transData)
+        ax.add_patch(pp1)
+        ax.plot([0], [0], "ro")
+        ax.set_title('The red point is the initial location')
+        ax.set_xlim(-3, 3)
+        ax.set_ylim(-0.1, 3)
+        ax.set_aspect(aspect='equal', adjustable='box')
+
+    def get_control_points(self, pose1, pose2):  # helper method for visualization
+        phi = pose1[2]-pose2[2]
+        if phi > np.pi:
+            phi = phi - 2*np.pi
+        elif phi < -np.pi:
+            phi = phi + 2*np.pi
+        L = np.sqrt((pose2[0]-pose1[0])**2 + (pose2[1]-pose1[1])**2)
+        R = L / (2 * np.sin(abs(phi/2)))
+        ofs_angle_sign = np.pi/2 if phi > 0 else -np.pi/2
+        ofs_angle = (pose2[2] + phi/2) + ofs_angle_sign
+        while ofs_angle > np.pi: ofs_angle -= 2*np.pi
+        while ofs_angle < -np.pi: ofs_angle += 2*np.pi
+        dir1 = pose1[2]-ofs_angle_sign
+        dir2 = pose2[2]-ofs_angle_sign
+        ofs_pos = np.array((R*np.cos(dir1), R*np.sin(dir1))) + pose1[:2]
+        ofs_pos2 = np.array((R*np.cos(dir2), R*np.sin(dir2))) + pose2[:2]
+        #print(R)
+        #print(ofs_angle, np.pi/4)
+        #print(dir1, dir2)
+        #print(ofs_pos, ofs_pos2)
+        assert np.linalg.norm(ofs_pos - ofs_pos2) < 1e-8
+        # get control points of simple arc
+        P0 = np.array( (np.cos(phi/2), np.sin(phi/2)) )
+        #P3 = np.array( (P0[0], -P0[1]) )
+        P1 = np.array( ((4-P0[0]) / 3, (1-P0[0]) * (3-P0[0])/(3 * P0[1])) )
+        P2 = np.array( (P1[0], -P1[1]) )
+        # apply transformation to control points
+        c, s = np.cos(ofs_angle), np.sin(ofs_angle)
+        rot_mat = np.array([[c, -s], [s, c]])
+        P0 = np.matmul(rot_mat, R*P0) + ofs_pos
+        P1 = np.matmul(rot_mat, R*P1) + ofs_pos
+        P2 = np.matmul(rot_mat, R*P2) + ofs_pos
+        #P3 = np.matmul(rot_mat, R*P3) + ofs_pos
+        #print(P0, pose1)
+        #print(P3, pose2)
+        assert np.linalg.norm(P0 - pose1[:2]) < 1e-8
+        #assert np.linalg.norm(P3 - pose2[:2]) < 1e-8
+        return P1, P2
 
     # Copied from lab1 SensorModel.py
     def lidar_cb(self, msg):
