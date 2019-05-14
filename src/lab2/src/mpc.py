@@ -11,12 +11,16 @@ import matplotlib.pyplot as plt
 import matplotlib.path as mpath
 import matplotlib.patches as mpatches
 from scipy.spatial.distance import directed_hausdorff
+from scipy.spatial.distance import cdist
 from scipy.stats import truncnorm
 from nav_msgs.msg import Path
-from geometry_msgs.msg import Pose, PoseStamped, PoseArray
+from visualization_msgs.msg import Marker
+from geometry_msgs.msg import Pose, PoseStamped, PoseArray, Point, PointStamped
 from std_msgs.msg import Header
 from sensor_msgs.msg import LaserScan
-SCAN_TOPIC = "" # Laser scan topic
+import os
+
+SCAN_TOPIC = "/scan" # Laser scan topic for actual laser scan
 
 class ModelPredictiveController(BaseController):
     def __init__(self):
@@ -25,11 +29,10 @@ class ModelPredictiveController(BaseController):
 
         self.reset_params()
         self.reset_state()
+        self.init_laser()
 
         rospy.loginfo('plotting traj lib')
         self.visualize_traj()
-        self.obs = None
-        #self.laser_sub = rospy.Subscriber(SCAN_TOPIC, LaserScan, self.lidar_cb, queue_size=1) # Callback at end of this file
 
     def get_reference_index(self, pose):
         '''
@@ -74,14 +77,28 @@ class ModelPredictiveController(BaseController):
         '''
         assert len(pose) == 3
 
-        rollouts = np.zeros((self.K, self.T, 3))
-
         # TODO: INSERT CODE HERE
         # With MPC, you should roll out K control trajectories using
         # the kinematic car model, then score each one with your cost
         # function, and finally select the one with the lowest cost.
 
         pose_ref = self.get_reference_pose(index)
+        if self.ENABLE_DYNAMIC_TRAJ:
+            prev_T = self.T
+            if np.linalg.norm(pose[:2]-pose_ref[:2]) > self.TRAJLIB_THRES:
+                self.T = self.Tshort
+                self.trajs = self.trajs_short
+                self.scaled = self.scaled_short
+                self.bbox_map = self.bbox_map_short
+                self.perm = self.perm_short
+            else:
+                self.T = self.Tlong
+                self.trajs = self.trajs_long
+                self.scaled = self.scaled_long
+                self.bbox_map = self.bbox_map_long
+                self.perm = self.perm_long
+                
+        rollouts = np.zeros((self.K, 1+self.T*self.pose_resol, 3))
 
         # For each K trial, the first position is at the current position (pose)
         # Set initial 
@@ -94,20 +111,22 @@ class ModelPredictiveController(BaseController):
 
         # Then step forward the K control trajectory T timesteps using
         # self.apply_kinematics
-        for i in xrange(1, self.T):
-            rollouts[:,i,:] = np.array(self.apply_kinematics(rollouts[:,i-1,:], self.trajs[:,i-1,:])).T # ...(positions, controls)
+        dt = self.dt / self.pose_resol
+        for i in xrange(self.T):
+            for j in xrange(self.pose_resol):
+                it = self.pose_resol*i + j
+                rollouts[:,it+1,:] = np.array(self.apply_kinematics(rollouts[:,it,:], self.trajs[:,i,:], dt)).T # ...(positions, controls)
 
         # Apply the cost function to the rolled out poses.
-        costs = self.apply_cost(rollouts, index)
+        costs = self.apply_cost(rollouts, pose, index)
 
         # Finally, find the control trajectory with the minimum cost.
         min_control = np.argmin(costs)
-        print 'costs', costs
-        print 'min control', min_control
+        # print 'costs', costs
+        # print 'min control', min_control
 
         # Return the controls which yielded the min cost.
-        print self.trajs[min_control][0]
-        rospy.loginfo(str(rollouts[min_control]))
+        #rospy.loginfo(str(rollouts[min_control]))
         self.visualize_selected_traj(rollouts[min_control])
         return self.trajs[min_control][0]
 
@@ -116,7 +135,7 @@ class ModelPredictiveController(BaseController):
         Utility function for resetting internal states.
         '''
         with self.path_lock:
-            self.trajs = self.get_control_trajectories2()
+            self.trajs = self.get_control_trajectories(self.T)
             assert self.trajs.shape == (self.K, self.T, 2)
             self.scaled = np.zeros((self.K * self.T, 3))
             self.bbox_map = np.zeros((self.K * self.T, 2, 4))
@@ -128,6 +147,15 @@ class ModelPredictiveController(BaseController):
             self.map_angle = utils.rosquaternion_to_angle(self.map.info.origin.orientation)
             self.map_c = np.cos(self.map_angle)
             self.map_s = np.sin(self.map_angle)
+            if self.ENABLE_DYNAMIC_TRAJ:
+                self.trajs_long = self.trajs
+                self.trajs_short = self.get_control_trajectories(self.Tshort)
+                self.scaled_long = self.scaled
+                self.bbox_map_long = self.bbox_map
+                self.perm_long = self.perm
+                self.scaled_short = self.scaled[:self.K*self.Tshort,:]
+                self.bbox_map_short = self.bbox_map[:self.K*self.Tshort,:,:]
+                self.perm_short = self.perm[:self.K*self.Tshort]
 
     def reset_params(self):
         '''
@@ -140,8 +168,8 @@ class ModelPredictiveController(BaseController):
             self.min_delta = float(rospy.get_param("trajgen/min_delta", -0.34))
             self.max_delta = float(rospy.get_param("trajgen/max_delta", 0.34))
 
-            self.K = int(rospy.get_param("mpc/K", 62))
-            self.T = int(rospy.get_param("mpc/T", 3))
+            self.K = int(rospy.get_param("mpc/K", 140))
+            self.T = int(rospy.get_param("mpc/T", 6))
 
             self.speed = float(rospy.get_param("mpc/speed", 1.0))
             self.finish_threshold = float(rospy.get_param("mpc/finish_threshold", 1.0))
@@ -156,9 +184,35 @@ class ModelPredictiveController(BaseController):
 
             # custom parameters
             self.dt = float(rospy.get_param("mpc/dt", 0.2))
-            self.shape_w = float(rospy.get_param("mpc/shape_w", 1.0))
+            self.shape_w = float(rospy.get_param("mpc/shape_w", 8.0))
+            self.num_branches = int(rospy.get_param("mpc/num_branches", 7))
+            self.pose_resol = int(rospy.get_param("mpc/pose_resolution", 2))
+            self.ENABLE_DYNAMIC_TRAJ = rospy.get_param("mpc/dynamic_traj", True)
+            if self.ENABLE_DYNAMIC_TRAJ:
+                self.Tlong = self.T
+                self.Tshort = 3
+                self.TRAJLIB_THRES = 1.0
 
-    def get_control_trajectories(self):
+    def init_laser(self):
+        self.EXCLUDE_MAX_RANGE_RAYS = True
+        self.OBS_STEPS = 3
+        self.LASER_RAY_STEP = 18
+        self.MAX_RANGE_METERS = 11.0
+        self.OBS_SAFE_DIST = 0.3
+        assert self.OBS_STEPS <= self.T
+
+        self.laser_sub = rospy.Subscriber(SCAN_TOPIC, LaserScan, self.lidar_cb, queue_size=1) # Callback at end of this file
+        self.obs_pub = rospy.Publisher("/mpc/obs_pos", Marker, queue_size=30)
+
+        self.laser_angles = None # The angles of each ray
+        self.downsampled_angles = None # The angles of the downsampled rays
+        self.downsampled_ranges = None # The ranges of the downsampled rays
+        self.filtered_angles = None
+        self.filtered_ranges = None
+        self.obs = None
+        self.obs_w = 3.0
+
+    def get_control_trajectories2(self):
         '''
         get_control_trajectories computes K control trajectories to be
             rolled out on each update step. You should only execute this
@@ -187,7 +241,7 @@ class ModelPredictiveController(BaseController):
         ctrls[0,:,1] = np.zeros(self.T)
         return ctrls
 
-    def get_control_trajectories2(self):
+    def get_control_trajectories(self, T):
         '''
         get_control_trajectories computes K control trajectories to be
             rolled out on each update step. You should only execute this
@@ -204,45 +258,29 @@ class ModelPredictiveController(BaseController):
         # TODO: INSERT CODE HERE
         # Create a trajectory library of K trajectories for T timesteps to
         # roll out when computing the best control.
-        ctrls = np.zeros((self.K, self.T, 2))
+        assert self.K in range(60, 150, 10)
+        if not os.path.exists(os.path.dirname(os.path.realpath(__file__)) + '/../traj_lib/depth_{}_branch_{}_size_{}.npy'.format(T, self.num_branches, self.K)):
+            self.precompute_traj_lib(T, self.num_branches)
+        return np.load(os.path.dirname(os.path.realpath(__file__)) + '/../traj_lib/depth_{}_branch_{}_size_{}.npy'.format(T, self.num_branches, self.K))
+        
 
-        time_start = time.time()
+    def precompute_traj_lib(self, t, num_branches):
         # generate dense set of paths D
-        num_branches = 7;
-        deltas = np.linspace(self.min_delta, self.max_delta, num=num_branches, endpoint=True)
-        D_size = num_branches**self.T
-        D = np.empty((D_size+1, self.T))  # +1 to account for default path
-
-        # use recursion to generate D
-        cnt = [0]
-        tmp_path = np.empty(self.T)
-        def set_dense_paths(d):
-            if d == self.T:
-                D[cnt[0],:] = tmp_path
-                cnt[0] += 1
-            else:
-                for i in xrange(num_branches):
-                    tmp_path[d] = deltas[i]
-                    set_dense_paths(d+1)
-        set_dense_paths(0)
-        # use loop to generate D
-        #step = num_branches
-        #for i in xrange(1, self.T+1):
-        #    # step = num_branches ** i
-        #    for k in xrange(num_branches):
-        #        offset = k * step / num_branches
-        #        for j in xrange(i):  # repeat deltas[k] i times
-        #            D[offset+k::step,self.T-i] = deltas[k]
-        #    step *= num_branches
-        D[D_size,:] = 0  # add default, straigh line path
-        rospy.loginfo('dense generation time:' + str(time.time()-time_start))
         time_start = time.time()
+        deltas = np.linspace(self.min_delta, self.max_delta, num=num_branches, endpoint=True)
+        D_size = num_branches**t
 
+        grid = np.meshgrid(*([deltas] * t), indexing='ij')
+        D = np.stack([x.flatten() for x in grid], axis=-1)
+        D = np.concatenate((D, np.zeros([1, int(t)]))) # straight
+        rospy.loginfo('dense generation time:' + str(time.time()-time_start))
+        dcache = {}  # dcache[(p1, p2)] = d(p1, p2), where p1 \in D, p2 \in S
 
+        K = range(60, 150, 10)
+        time_start = time.time()
         # contruct subset S with (hopefully) maximum coverage
         S = set((D_size,))  # add default to S
-        dcache = {}  # dcache[(p1, p2)] = d(p1, p2), where p1 \in D, p2 \in S
-        for i in xrange(1, self.K):
+        for i in xrange(1, max(K)):
             # find path that (might) makes maximum dispersion after adding it to S
             max_mindist = -1000000
             new_path = None
@@ -256,8 +294,6 @@ class ModelPredictiveController(BaseController):
                         else:
                             p1 = D[[path]]
                             p2 = D[[path_S]]
-                            # p1 = np.concatenate((D[path,:].reshape(self.T, 1), np.zeros((self.T, 1))), axis=1)
-                            # p2 = np.concatenate((D[path_S,:].reshape(self.T, 1), np.zeros((self.T, 1))), axis=1)
                             dist = max(directed_hausdorff(p1, p2)[0], directed_hausdorff(p2, p1)[0])
                             dcache[(path, path_S)] = dist
                         min_dist = min(min_dist, dist)
@@ -265,20 +301,18 @@ class ModelPredictiveController(BaseController):
                     if min_dist > max_mindist:
                         max_mindist = min_dist
                         new_path = path
-            #print 'mmd',max_mindist
-            #print 'np', new_path
             assert new_path != None
             S.add(new_path)
+            if len(S) in K:
+                ctrls = np.zeros((len(S), t, 2))
+                cnt = 0
+                for path in S:
+                    ctrls[cnt,:,1] = D[path,:]
+                    cnt += 1
+                rospy.loginfo('traj selection time:' + str(time.time()-time_start))
+                np.save(os.path.dirname(os.path.realpath(__file__)) + '/../traj_lib/depth_{}_branch_{}_size_{}.npy'.format(t, num_branches, len(S)), ctrls)
 
-        assert len(S) == self.K
-        cnt = 0
-        for path in S:
-            ctrls[cnt,:,1] = D[path,:]
-            cnt += 1
-        rospy.loginfo('traj selection time:' + str(time.time()-time_start))
-        return ctrls
-
-    def apply_kinematics(self, cur_x, control):
+    def apply_kinematics(self, cur_x, control, dt):
         '''
         apply_kinematics 'steps' forward the pose of the car using
             the kinematic car model for a given set of K controls.
@@ -304,23 +338,25 @@ class ModelPredictiveController(BaseController):
         velocity = control[:,0]
         delta = control[:,1]
 
-        theta_dot = theta + (velocity / self.B * np.tan(delta)) * self.dt
+        theta_dot = theta + (velocity / self.B * np.tan(delta)) * dt
         x_dot = x + (self.B / (np.tan(delta)+1e-12) * (np.sin(theta_dot) - np.sin(theta))) 
         y_dot = y + (self.B / (np.tan(delta)+1e-12) * (-np.cos(theta_dot) + np.cos(theta)))
         straight_idx = (np.absolute(delta) < 1e-8)
-        x_dot[straight_idx] = x[straight_idx] + ((np.cos(theta))[straight_idx])*velocity[straight_idx]*self.dt
-        y_dot[straight_idx] = y[straight_idx] + ((np.sin(theta))[straight_idx])*velocity[straight_idx]*self.dt
+        x_dot[straight_idx] = x[straight_idx] + ((np.cos(theta))[straight_idx])*velocity[straight_idx]*dt
+        y_dot[straight_idx] = y[straight_idx] + ((np.sin(theta))[straight_idx])*velocity[straight_idx]*dt
 
 
         
         return (x_dot, y_dot, theta_dot)
 
-    def apply_cost(self, poses, index):
+    def apply_cost(self, poses, curr_pose, index):
         '''
-        rollouts (K,T,3) - poses of each rollout
+        rollouts (K,T*pose_resol+1,3) - poses of each rollout
         index    (int)   - reference index in path
         '''
-        all_poses = poses.copy()
+        path_steps = poses.shape[1]
+        all_poses = poses[:,self.pose_resol:path_steps:self.pose_resol].copy()
+        assert all_poses.shape == (self.K, self.T, 3)
         all_poses.resize(self.K * self.T, 3)
         collisions = self.check_collisions_in_map(all_poses)
         collisions.resize(self.K, self.T)
@@ -333,14 +369,27 @@ class ModelPredictiveController(BaseController):
             d += np.linalg.norm(self.path[end_idx,:2]-self.path[end_idx-1,:2])
             end_idx += 1
         ref_path = self.path[index:end_idx,:2]
+        if d < path_dist:
+            rem_d = path_dist - d
+            step_dist = (d / (end_idx-index)) if end_idx-1 > index else 0.05
+            rem_poses = int(rem_d / step_dist)
+            x_end = self.path[end_idx-1,0] + rem_d*np.cos(self.path[end_idx-1,2])
+            y_end = self.path[end_idx-1,1] + rem_d*np.sin(self.path[end_idx-1,2])
+            append_poses = np.empty((rem_poses, 2))
+            append_poses[:,0] = np.linspace(self.path[end_idx-1,0], x_end, num=rem_poses+1, endpoint=True)[1:]
+            append_poses[:,1] = np.linspace(self.path[end_idx-1,1], y_end, num=rem_poses+1, endpoint=True)[1:]
+            ref_path = np.concatenate((ref_path, append_poses), axis=0)
         shape_cost = np.empty(self.K)
         for i in xrange(self.K):
             prop_path = poses[i,:,:2]
             shape_cost[i] = max(directed_hausdorff(ref_path, prop_path)[0], directed_hausdorff(prop_path, ref_path)[0])
         shape_cost *= self.shape_w
-        error_cost = np.linalg.norm(poses[:, self.T - 1, :2] - self.path[index, :2], axis=1) * self.error_w
-
-        return collision_cost + error_cost + shape_cost
+        error_cost = np.linalg.norm(poses[:, path_steps - 1, :2] - self.path[index, :2], axis=1) * self.error_w
+        obs_cost = self.obstacle_cost(curr_pose, poses[:,:self.OBS_STEPS*self.pose_resol+1,:]) * self.obs_w
+        rospy.loginfo('shape cost' + str(shape_cost))
+        rospy.loginfo('error cost' + str(error_cost))
+        rospy.loginfo('obs cost' + str(obs_cost))
+        return collision_cost + error_cost + shape_cost + obs_cost
 
     def check_collisions_in_map(self, poses):
         '''
@@ -450,9 +499,9 @@ class ModelPredictiveController(BaseController):
     def visualize_selected_traj(self, poses):
         #rospy.loginfo("poses length" + str(poses.shape))
         path_poses = []
-        assert self.T == poses.shape[0]
+        assert self.T*self.pose_resol+1 == poses.shape[0]
         time_now = rospy.Time.now()
-        for i in xrange(self.T):
+        for i in xrange(poses.shape[0]):
             pose = PoseStamped()
             #pose.header = Header()
             #pose.header.stamp = time_now
@@ -471,13 +520,13 @@ class ModelPredictiveController(BaseController):
 
     def visualize_traj(self):  # must be called after get_control_trajectories()
         fig, ax = plt.subplots()
-        rollouts = np.zeros((self.K, self.T, 3))
+        rollouts = np.zeros((self.K, self.T+1, 3))
         rollouts[:,0,0] = 0
         rollouts[:,0,1] = 0
         rollouts[:,0,2] = np.pi/2
         self.trajs[:,:,0] = 2.0
-        for i in xrange(1, self.T):              
-            rollouts[:,i,:] = np.array(self.apply_kinematics(rollouts[:,i-1,:], self.trajs[:,i-1,:])).T
+        for i in xrange(self.T):              
+            rollouts[:,i+1,:] = np.array(self.apply_kinematics(rollouts[:,i,:], self.trajs[:,i,:], self.dt)).T
         for i in xrange(self.K):
             self.plot_path(ax, rollouts[i])
         plt.show()
@@ -555,8 +604,6 @@ class ModelPredictiveController(BaseController):
 
     # Copied from lab1 SensorModel.py
     def lidar_cb(self, msg):
-        self.state_lock.acquire()
-        
         # Down sample the laser rays
         if not self.EXCLUDE_MAX_RANGE_RAYS:
           # Initialize angle arrays
@@ -591,4 +638,49 @@ class ModelPredictiveController(BaseController):
         # Each element of obs must be a numpy array of type np.float32
         # Use self.LASER_RAY_STEP as the downsampling step
         # Keep efficiency in mind, including by caching certain things that won't change across future iterations of this callback
-        self.obs = (np.copy(self.downsampled_ranges).astype(np.float32), self.downsampled_angles.astype(np.float32)) 
+        self.obs = (np.copy(self.downsampled_ranges).astype(np.float32), self.downsampled_angles.astype(np.float32))
+
+    def obstacle_cost(self, curr_pose, poses):
+        rospy.loginfo('num beams %s %s', self.obs[0].shape[0], self.obs[1].shape[0])
+        filtered_thres = self.OBS_STEPS * 2.0 * self.dt
+        assert filtered_thres < self.MAX_RANGE_METERS
+        obs_indices = (self.obs[0] <= filtered_thres)
+        obs = (self.obs[0][obs_indices], self.obs[1][obs_indices])
+        obs_h = obs[1] + curr_pose[2]
+        obs_pos = np.stack((curr_pose[0] + obs[0]*np.cos(obs_h), curr_pose[1] + obs[0]*np.sin(obs_h)), axis=1)
+        self.plot_obs(obs_pos)
+        positions = poses[:,:,:2].copy()
+        positions.resize(poses.shape[0] * poses.shape[1], 2)
+        assert positions.shape == (poses.shape[0] * poses.shape[1], 2)
+        pose_obs_dist = cdist(positions, obs_pos, 'euclidean')
+        pose_obs_dist.resize(poses.shape[0], poses.shape[1], obs_pos.shape[0])
+        assert pose_obs_dist.shape == (self.K, poses.shape[1], obs_pos.shape[0])
+        pose_costs = np.zeros((self.K, poses.shape[1], obs_pos.shape[0]))
+        danger_indices = pose_obs_dist < self.OBS_SAFE_DIST
+        pose_costs[danger_indices] = self.OBS_SAFE_DIST - pose_obs_dist[danger_indices]
+        final_costs = np.sum(np.sum(pose_costs, axis=2), axis=1)
+        return final_costs # Array of size K
+
+    def plot_obs(self, obs_pos):
+        time_now = rospy.Time.now()
+        marker = Marker()
+        marker.header.frame_id = '/map'
+        marker.header.stamp = time_now
+        marker.type = Marker.POINTS
+        marker.action = Marker.ADD
+        marker.pose = Pose()
+        marker.scale.x = 0.05
+        marker.scale.y = 0.05
+        marker.scale.z = 0.05
+        marker.color.a = 1.0
+        marker.color.r = 0.0
+        marker.color.g = 0.0
+        marker.color.b = 1.0
+        points = []
+        for i in xrange(obs_pos.shape[0]):
+            p = Point()
+            p.x = obs_pos[i,0]
+            p.y = obs_pos[i,1]
+            points.append(p)
+        marker.points = points
+        self.obs_pub.publish(marker)
