@@ -73,7 +73,7 @@ class ControlNode:
         self.load_controller()
         self.ready_event.set()
 
-        rate = rospy.Rate(8) # 50 in sim
+        rate = rospy.Rate(50) # 50 in sim, 8 in real with PF
         self.inferred_pose = None
         print "Control Node Initialized"
         while not rospy.is_shutdown():

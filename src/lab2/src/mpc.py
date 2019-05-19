@@ -7,9 +7,8 @@ from controller import BaseController
 from nav_msgs.srv import GetMap
 
 import time
-import matplotlib.pyplot as plt
-import matplotlib.path as mpath
-import matplotlib.patches as mpatches
+import trajutil
+import rosviz
 from scipy.spatial.distance import directed_hausdorff
 from scipy.spatial.distance import cdist
 from scipy.stats import truncnorm
@@ -33,7 +32,7 @@ class ModelPredictiveController(BaseController):
             self.init_laser()
 
         rospy.loginfo('plotting traj lib')
-        self.visualize_traj()
+        trajutil.visualize_traj(self.K, self.T, self.num_branches)
 
     def get_reference_index(self, pose):
         '''
@@ -128,7 +127,8 @@ class ModelPredictiveController(BaseController):
 
         # Return the controls which yielded the min cost.
         #rospy.loginfo(str(rollouts[min_control]))
-        self.visualize_selected_traj(rollouts[min_control])
+        #self.visualize_selected_traj(rollouts[min_control])
+        rosviz.viz_paths_cmap(rollouts, costs, cmap='seismic')
         return self.trajs[min_control][0]
 
     def reset_state(self):
@@ -170,7 +170,7 @@ class ModelPredictiveController(BaseController):
             self.max_delta = float(rospy.get_param("trajgen/max_delta", 0.34))
 
             self.K = int(rospy.get_param("mpc/K", 60))
-            self.T = int(rospy.get_param("mpc/T", 3))
+            self.T = int(rospy.get_param("mpc/T", 5))
 
             self.speed = float(rospy.get_param("mpc/speed", 1.0))
             self.finish_threshold = float(rospy.get_param("mpc/finish_threshold", 1.0))
@@ -258,7 +258,8 @@ class ModelPredictiveController(BaseController):
         file_path = os.path.dirname(os.path.realpath(__file__)) + '/../traj_lib/depth_{}_branch_{}_size_{}.npy'.format(T, self.num_branches, self.K)
         assert self.K in range(60, 150, 10)
         if not os.path.exists(file_path):
-            rospy.logerr("file not exist: {}\nRun python trajutil generate <steps> <num_branches> to generate trajectories library of size in range(60, 150, 10).".format(file_path))
+            rospy.logerr("file not exist: {}".format(file_path))
+            rospy.logerr("Run \"python trajutil.py generate <steps> <num_branches>\" to generate trajectories library of size in range(60, 150, 10).")
         return np.load(file_path)
 
     def apply_kinematics(self, cur_x, control, dt):
@@ -470,90 +471,6 @@ class ModelPredictiveController(BaseController):
         path.header.frame_id = "map"
         path.poses = path_poses
         self.traj_pub.publish(path)
-
-    def visualize_traj(self):  # must be called after get_control_trajectories()
-        fig, ax = plt.subplots()
-        rollouts = np.zeros((self.K, self.T+1, 3))
-        rollouts[:,0,0] = 0
-        rollouts[:,0,1] = 0
-        rollouts[:,0,2] = np.pi/2
-        self.trajs[:,:,0] = 2.0
-        for i in xrange(self.T):
-            rollouts[:,i+1,:] = np.array(self.apply_kinematics(rollouts[:,i,:], self.trajs[:,i,:], self.dt)).T
-        for i in xrange(self.K):
-            self.plot_path(ax, rollouts[i])
-        plt.show()
-
-    def plot_path(self, ax, poses):
-        '''
-        poses: (T x 3) ndarray, where each pose is (x, y, theta), theta in [-pi, pi]
-        '''
-        Path = mpath.Path
-
-        for i in xrange(poses.shape[0]):
-          ax.arrow(poses[i,0], poses[i,1], 0.05*np.cos(poses[i,2]), 0.05*np.sin(poses[i,2]), width=0.003)
-
-        path_verts = [poses[0,:2]]
-        path_codes = [Path.MOVETO]
-        for i in xrange(1, poses.shape[0]):
-          heading_diff = abs(poses[i-1,2] - poses[i,2])
-          if heading_diff < 1e-8 or abs(heading_diff-2*np.pi) < 1e-8:
-            path_verts.append(poses[i,:2])
-            path_codes.append(Path.LINETO)
-          else:
-            ct1, ct2 = self.get_control_points(poses[i-1], poses[i])
-            path_verts.extend((ct1, ct2, poses[i,:2]))
-            path_codes.extend((Path.CURVE4,)*3)
-        #return path_verts, path_codes
-        pp1 = mpatches.PathPatch(
-          Path(path_verts,
-               path_codes),
-          fc="none", transform=ax.transData)
-        ax.add_patch(pp1)
-        ax.plot([0], [0], "ro")
-        ax.set_title('The red point is the initial location')
-        ax.set_xlim(-3, 3)
-        ax.set_ylim(-0.1, 3)
-        ax.set_aspect(aspect='equal', adjustable='box')
-
-    def get_control_points(self, pose1, pose2):  # helper method for visualization
-        phi = pose1[2]-pose2[2]
-        if phi > np.pi:
-            phi = phi - 2*np.pi
-        elif phi < -np.pi:
-            phi = phi + 2*np.pi
-        L = np.sqrt((pose2[0]-pose1[0])**2 + (pose2[1]-pose1[1])**2)
-        R = L / (2 * np.sin(abs(phi/2)))
-        ofs_angle_sign = np.pi/2 if phi > 0 else -np.pi/2
-        ofs_angle = (pose2[2] + phi/2) + ofs_angle_sign
-        while ofs_angle > np.pi: ofs_angle -= 2*np.pi
-        while ofs_angle < -np.pi: ofs_angle += 2*np.pi
-        dir1 = pose1[2]-ofs_angle_sign
-        dir2 = pose2[2]-ofs_angle_sign
-        ofs_pos = np.array((R*np.cos(dir1), R*np.sin(dir1))) + pose1[:2]
-        ofs_pos2 = np.array((R*np.cos(dir2), R*np.sin(dir2))) + pose2[:2]
-        #print(R)
-        #print(ofs_angle, np.pi/4)
-        #print(dir1, dir2)
-        #print(ofs_pos, ofs_pos2)
-        assert np.linalg.norm(ofs_pos - ofs_pos2) < 1e-8
-        # get control points of simple arc
-        P0 = np.array( (np.cos(phi/2), np.sin(phi/2)) )
-        #P3 = np.array( (P0[0], -P0[1]) )
-        P1 = np.array( ((4-P0[0]) / 3, (1-P0[0]) * (3-P0[0])/(3 * P0[1])) )
-        P2 = np.array( (P1[0], -P1[1]) )
-        # apply transformation to control points
-        c, s = np.cos(ofs_angle), np.sin(ofs_angle)
-        rot_mat = np.array([[c, -s], [s, c]])
-        P0 = np.matmul(rot_mat, R*P0) + ofs_pos
-        P1 = np.matmul(rot_mat, R*P1) + ofs_pos
-        P2 = np.matmul(rot_mat, R*P2) + ofs_pos
-        #P3 = np.matmul(rot_mat, R*P3) + ofs_pos
-        #print(P0, pose1)
-        #print(P3, pose2)
-        assert np.linalg.norm(P0 - pose1[:2]) < 1e-8
-        #assert np.linalg.norm(P3 - pose2[:2]) < 1e-8
-        return P1, P2
 
     # Copied from lab1 SensorModel.py
     def lidar_cb(self, msg):

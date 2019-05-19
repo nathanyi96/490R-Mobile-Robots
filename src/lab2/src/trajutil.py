@@ -87,7 +87,7 @@ def visualize_traj(K, T, num_branches):  # must be called after get_control_traj
     filename = _trajlib_path.format(T, num_branches, K)
     if not os.path.exists(filename):
         print "file not exist: {}".format(filename)
-        print "Run python trajutil generate <steps> <num_branches> to generate trajectories library of size in range(60, 150, 10)."
+        print "Run \"python trajutil.py generate <steps> <num_branches>\" to generate trajectories library of size in range(60, 150, 10)."
         return
     trajs = np.load(filename)
     fig, ax = plt.subplots()
@@ -193,7 +193,6 @@ if __name__ == '__main__':
     parser_gen.set_defaults(func=precompute_traj_lib)
 
     args = parser.parse_args()
-    print args
     if args.func == precompute_traj_lib:
         precompute_traj_lib(args.steps, args.branches, _MIN_DELTA, _MAX_DELTA)
     elif args.func == visualize_traj:

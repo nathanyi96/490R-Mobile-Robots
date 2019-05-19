@@ -4,5 +4,5 @@
 </launch>
 
 
-# scp path_to_file nvidia@172.16.77.carnumber:~/catkin_ws/src/lab2/scripts/
-# <node pkg="map_server" name="map_server" type="map_server" args="$(find lab2)/maps/cse022_demo.yaml"/>
+<!-- scp path_to_file nvidia@172.16.77.carnumber:~/catkin_ws/src/lab2/scripts/ -->
+<!-- <node pkg="map_server" name="map_server" type="map_server" args="$(find lab2)/maps/cse022_demo.yaml"/> -->

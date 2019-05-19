@@ -402,9 +402,9 @@ if __name__ == '__main__':
                       speed_to_erpm_offset, speed_to_erpm_gain, steering_angle_to_servo_offset,
                       steering_angle_to_servo_gain, car_length)
 
+  prev_time = time.time()
   while not rospy.is_shutdown():  # Keep going until we kill it
     # Callbacks are running in separate threads
-    
     if pf.sensor_model.confidence < 1e-20 and not pf.global_localize:
         print '=================== KIDNAPPED ====================='
         pf.global_localize = True
@@ -432,6 +432,8 @@ if __name__ == '__main__':
       pf.sensor_model.do_resample = False # Reset so that we don't keep resampling
       pf.resampler.resample_low_variance()
       pf.visualize() # Perform visualization
+      rospy.logdebug(time.time() - prev_time)
+      prev_time = time.time()
 
 
 

@@ -29,10 +29,11 @@ def circle():
 
 
 def left_turn():
-    offset = np.array([[-7.0, -1.7, 0]])
+    #offset = np.array([[-7.0, -1.7, 0]])
+    offset = np.array([[0, 0, 0]])
     waypoint_sep = 0.1
     turn_radius = 1.5
-    straight_len = 5.0
+    straight_len = 10.0
     turn_center = [straight_len, turn_radius]
     straight_xs = np.linspace(0, straight_len, int(straight_len / waypoint_sep))
     straight_poses = [[x, 0, 0] for x in straight_xs]
@@ -99,7 +100,7 @@ if __name__ == '__main__':
     else:
         h = Header()
         h.stamp = rospy.Time.now()
-        desired_speed = 2 # 0.5
+        desired_speed = 2.0 # 0.5
         ramp_percent = 0.1
         ramp_up = np.linspace(0.0, desired_speed, int(ramp_percent * len(configs)))
         ramp_down = np.linspace(desired_speed, 0.3, int(ramp_percent * len(configs)))
