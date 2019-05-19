@@ -24,6 +24,47 @@ Contents to be used for writeup.
     			minimize cross track and theta error. When the lookahead distance is too little, the controller causes the robot to oscillate about the path due to computed steering angle being too large. We noticed that lookahead distances approximately less than 1.0 meters(?) causes performance to suffer.
     		B.
 
+    (c)
+        i. 
+            A.  The trajectory plot is generated and put in the folder 'plot'. <Insert graph>
+            B.  In simulation we uses ... as K and 3 and 5 as T for the model to dynamically switch libraries.
+                When the car has large position error, it would apply short library to quickly catch up, in other
+                cases it would use longer trajectory library to search for optimal path.
+        ii.
+            A.  We add a new cost function called shape cost, which is defined as the hausdorff distance between the trajectory and
+                the truncated reference path. To find the reference path, we simply take the reference index (which is the closest pose
+                in the path), and extend it in certain length. In normal cases, we multiply its current velocity with the number of time steps
+                in our trajectory library to compute the end index, and take all indexes from current index to the end index to be 
+                the reference path. In cases near the end, we just extend reference path in its current direction for similar distance, and collect
+                the way points. Once we have the reference path and our trajectory, our shape costs would be the hausdorff distance between them, which
+                intuitively measures how much dispersion does our path have with respect to the reference. This cost is more robust than just measuring
+                the distance of the end position, and it provides solid information for measuring the quality of a path.
+            B.  We first realized that there're various cases where just comparing the distance of the end point in the trajectory with reference will fail.
+                For instance, the information of shape of path and middle way points are not considered, which makes the car fail to converge well even in 
+                straight line. So we came up with the shape costs and saw that the car model won't converge at the end of the path.
+                Then, we realized that it's worth adding an edge case for extending the path.
+            C.  Yes, the records of tuning the gains are in...
+            D.  The heatmap is created ... 
+        iii.
+            Since we add the shape costs to our cost functions, we end up not using any lookahead strategy in finding reference pose.
+    (d).
+        From our search, we have the following findings:
+        (1). MPC is the only controller that can take dynamic information into account, so it's advantageous to use in real time.
+        (2). Lyapunov is the controller that has strong guarantee, in simulation it always converges and finishes the path, so it's robust.
+        (3). PID is the controller that requires lots of tuning, but in real world it works decently well.
+        (4). Pure pursuit works well in high speed regime, because it has a look ahead strategy. In real world, it can smoothly make turns
+             compared with other controllers.
+    
+    (Extra Credits) Avoiding real obstacles with MPC:
+        The code and the videos can be found in..
+        The algorithm for the obstacle distance costs are: (1). Based on laser scan and safety threshold, find potential obstacle points by backprojection on range and angles.
+        (2). For each trajectory, compute the euclidean distance of all pairs of the waypoints and the obstacle points. (3). Weight this cost and combine with the original cost
+        to find the best trajectory. After we added this cost, the car is able to keep away from the obstacle in addition to avoiding them. Moreover, the spontaneous response 
+        enable the robot to turn much earlier before hitting the obstacles. 
+
+    (Extra Credits) Non-linear Control: 
+        The answer can be found in CSE_490R_LAB2.pdf.
+
 
 
 Use runner_script_log to run experiments, results would be saved in lab2_performance_log.txt
