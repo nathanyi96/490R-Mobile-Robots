@@ -154,7 +154,7 @@ class SensorModel:
             self.conf_sum -= self.conf_history.get()
         if self.conf_history.qsize() == self.CONF_HISTORY_SIZE:
             self.confidence = self.conf_sum / self.conf_history.qsize()
-        print 'confidence:', self.confidence
+        #print 'confidence:', self.confidence
 
     self.weights /= np.sum(self.weights)
     

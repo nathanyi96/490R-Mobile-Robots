@@ -1,0 +1,5 @@
+<launch>
+	<arg name="controller" default="PID" />
+    <param name="/controller/type" value="$(arg controller)"/>
+    <node pkg="lab2" name="controller" type="main.py"/>
+</launch>

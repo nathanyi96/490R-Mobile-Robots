@@ -401,7 +401,7 @@ if __name__ == '__main__':
                       exclude_max_range_rays, max_range_meters, 
                       speed_to_erpm_offset, speed_to_erpm_gain, steering_angle_to_servo_offset,
                       steering_angle_to_servo_gain, car_length)
-  
+
   while not rospy.is_shutdown():  # Keep going until we kill it
     # Callbacks are running in separate threads
     
@@ -432,6 +432,7 @@ if __name__ == '__main__':
       pf.sensor_model.do_resample = False # Reset so that we don't keep resampling
       pf.resampler.resample_low_variance()
       pf.visualize() # Perform visualization
+
 
 
 

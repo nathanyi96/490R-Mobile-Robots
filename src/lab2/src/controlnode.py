@@ -1,14 +1,16 @@
 import rospy
 import threading
 
+import numpy as np
+import os
 from ackermann_msgs.msg import AckermannDriveStamped
 from geometry_msgs.msg import PoseStamped, PoseArray, Pose, PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Empty
 from std_msgs.msg import Header, Float32
 from std_srvs.srv import Empty as SrvEmpty
-from lab2.msg import XYHVPath
-from lab2.srv import FollowPath
+from lab2.msg import XYHVPath, XYHVPath_log
+from lab2.srv import FollowPath, FollowPath_log
 from visualization_msgs.msg import Marker
 
 import mpc
@@ -24,6 +26,26 @@ controllers = {
     "MPC": mpc.ModelPredictiveController,
 }
 
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
+
+    def __repr__(self):
+        return '{:.3f} ({:.3f})'.format(self.val, self.avg)
 
 class ControlNode:
     def __init__(self, name):
@@ -32,7 +54,17 @@ class ControlNode:
         self.path_event = threading.Event()
         self.reset_lock = threading.Lock()
         self.ready_event = threading.Event()
+        self.error_logger = AverageMeter()
+        self.initialpose = np.zeros(3)
         self.start(name)
+
+    def log_error(self):
+        rospy.loginfo(self.path_name)
+        rospy.loginfo(self.initialpose[0])
+        with open(os.path.dirname(os.path.realpath(__file__)) + '/lab2_performance_log.txt', 'a+') as f:
+            f.write('controller: {}, average error: {}, path: {}, init pose: ({},{},{})\n'.format(
+            self.controller_type, self.error_logger.avg, self.path_name, self.initialpose[0], self.initialpose[1], self.initialpose[2]))
+        self.error_logger.reset()
 
     def start(self, name):
         rospy.init_node(name, anonymous=True, disable_signals=True)
@@ -41,26 +73,26 @@ class ControlNode:
         self.load_controller()
         self.ready_event.set()
 
-        rate = rospy.Rate(50)
+        rate = rospy.Rate(8) # 50 in sim
         self.inferred_pose = None
         print "Control Node Initialized"
-
         while not rospy.is_shutdown():
             self.path_event.wait()
             self.reset_lock.acquire()
             ip = self.inferred_pose
-            # print '>>>>>>>', self.controller.ready(),ip is not None
             if ip is not None and self.controller.ready():
                 index = self.controller.get_reference_index(ip)
                 pose = self.controller.get_reference_pose(index)
                 error = self.controller.get_error(ip, index)
                 cte = error[1]
+                self.error_logger.update(np.linalg.norm(error))
                 self.publish_selected_pose(pose)
                 self.publish_cte(cte)
                 next_ctrl = self.controller.get_control(ip, index)
                 if next_ctrl is not None:
                     self.publish_ctrl(next_ctrl)
                 if self.controller.path_complete(ip, error):
+                    self.log_error()                   
                     self.path_event.clear()
             self.reset_lock.release()
             rate.sleep()
@@ -72,7 +104,7 @@ class ControlNode:
         exit(0)
 
     def load_controller(self):
-        self.controller_type = rospy.get_param("/controller/type", default="PID")
+        self.controller_type = rospy.get_param("/controller/type", default="PP")
         self.controller = controllers[self.controller_type]()
 
     def setup_pub_sub(self):
@@ -82,11 +114,12 @@ class ControlNode:
 
         rospy.Subscriber("/initialpose",
                 PoseWithCovarianceStamped, self.cb_init_pose, queue_size=1)
+        # rospy.Subscriber("/controller/set_path",
+        #         XYHVPath, self.cb_path, queue_size=1)
         rospy.Subscriber("/controller/set_path",
-                XYHVPath, self.cb_path, queue_size=1)
-
-        rospy.Service("/controller/follow_path", FollowPath, self.cb_path)
-
+                XYHVPath_log, self.cb_path_log, queue_size=1)
+        # rospy.Service("/controller/follow_path", FollowPath, self.cb_path)
+        rospy.Service("/controller/follow_path_log", FollowPath_log, self.cb_path_log)
         rospy.Subscriber(rospy.get_param("~pose_topic", "/sim_car_pose/pose"),
                              PoseStamped, self.cb_pose, queue_size=10)
 
@@ -167,12 +200,23 @@ class ControlNode:
         self.inferred_pose = utils.rospose_to_posetup(msg.pose.pose)
 
     def cb_path(self, msg):
-        print "Got path!"
+        rospy.loginfo("Got path!")
         path = msg.path.waypoints
         self.visualize_path(path)
         self.controller.set_path(path)
         self.path_event.set()
         print "Path set"
+        return True
+
+    def cb_path_log(self, msg):
+        rospy.loginfo("Got path!!")
+        path = msg.path.waypoints
+        self.path_name = msg.path_name
+        rospy.loginfo(self.path_name)
+        self.visualize_path(path)
+        self.controller.set_path(path)
+        self.path_event.set()
+        rospy.loginfo("Path set")
         return True
 
     def cb_pose(self, msg):
@@ -188,6 +232,7 @@ class ControlNode:
         ctrlmsg.header.seq = self.ackermann_msg_id
         ctrlmsg.drive.speed = ctrl[0]
         ctrlmsg.drive.steering_angle = ctrl[1]
+        # rospy.loginfo("v: {}, delta: {}".format(ctrl[0], ctrl[1]))
         self.rp_ctrls.publish(ctrlmsg)
         self.ackermann_msg_id += 1
 
@@ -244,4 +289,5 @@ class ControlNode:
         self.rp_cte.publish(Float32(cte))
 
     def cb_init_pose(self, pose):
+        self.initialpose = utils.rospose_to_posetup_(pose)
         self.path_event.set()

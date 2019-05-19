@@ -1,0 +1,10 @@
+<launch>
+	<!-- <include file="$(find racecar)/launch/teleop.launch" /> -->
+    <arg name="map_file" default="$(find lab2)/maps/cse002.yaml" />
+    <arg name="controller" default="PID" />
+    <param name="/controller/type" value="$(arg controller)"/>
+    <node pkg="map_server" name="map_server" type="map_server" args="$(arg map_file)"/>
+    <include file="$(find lab1)/launch/ParticleFilter.launch">
+    <include file="$(find lab2)/launch/controller.launch">
+    <!-- <node type="rviz" name="rviz" pkg="rviz"/> -->
+</launch>

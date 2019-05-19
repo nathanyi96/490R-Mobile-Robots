@@ -1,0 +1,5 @@
+<launch>
+    <param name="/controller/type" value="NL"/>
+    <param name="/controller/pose_topic" value="/pf/viz/inferred_pose"/>
+    <node pkg="lab2" name="controller" type="main.py"/>
+</launch>

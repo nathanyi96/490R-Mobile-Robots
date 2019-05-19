@@ -1,0 +1,33 @@
+Writeup
+
+Contents to be used for writeup.
+
+6.
+	(a)
+  		i.
+    		A.	The PID controller cross track and theta error converged to 0 relatively quickly with the default proportational and derivative		constants.
+    			<Insert graph>
+    		B.	The metrics we used was cross track error throughout time.
+    			<Insert graph>
+    		C.	The summation of cross track and theta error was slightly optimized, but as mentioned beforehand, the default constants allowed 
+    			the PID controller's cross track and theta error to converge to 0 relatively quickly.
+    			<Insert graph>
+    		D.	We noticed that increasing K_p too much tends to cause the robot to overshoot its set point and oscillate about the path
+    			waypoints. However, decreasing K_p too much tends causes slow convergence. As for K_d, we noticed that increasing K_d too much causes slow convergence and that decreasing K_d too much causes oscillating behavior.
+    			<Insert graph>
+    	ii.	 The final K_p value is 3.0, and the final K_d value is 1.0.
+    	iii. Using sin(theta_error) allows the PID controller to be less susceptible to noise, so we used the analytical derivative instead of the 
+    		 numerical approximation of the error derivative.
+    (b)
+    	i.
+    		A.	We noticed that increasing the lookahead distance tends to improve the robustness of the robot in that the controller was able to 
+    			minimize cross track and theta error. When the lookahead distance is too little, the controller causes the robot to oscillate about the path due to computed steering angle being too large. We noticed that lookahead distances approximately less than 1.0 meters(?) causes performance to suffer.
+    		B.
+
+
+
+Use runner_script_log to run experiments, results would be saved in lab2_performance_log.txt
+
+each path, each controller, multiple initial points and record the errors. (pp has different reference index)
+
+heatmap could just be different starting point in the map and the total costs taken to reach the selected goal points

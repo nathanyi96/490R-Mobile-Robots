@@ -29,7 +29,8 @@ class ModelPredictiveController(BaseController):
 
         self.reset_params()
         self.reset_state()
-        self.init_laser()
+        if self.ENABLE_OBS_DIST:
+            self.init_laser()
 
         rospy.loginfo('plotting traj lib')
         self.visualize_traj()
@@ -50,7 +51,7 @@ class ModelPredictiveController(BaseController):
             # point and chose the next point some distance away along
             # the path. You are welcome to use the same method for MPC
             # as you used for PID or Pure Pursuit.
-            
+
             # dist = np.sum((self.path[:,0:2] - pose[0:2])**2, axis=1)
             # dist = np.sqrt(dist)
             # argm = np.argmin(dist)
@@ -97,17 +98,17 @@ class ModelPredictiveController(BaseController):
                 self.scaled = self.scaled_long
                 self.bbox_map = self.bbox_map_long
                 self.perm = self.perm_long
-                
+
         rollouts = np.zeros((self.K, 1+self.T*self.pose_resol, 3))
 
         # For each K trial, the first position is at the current position (pose)
-        # Set initial 
+        # Set initial
         rollouts[:,0,0] = pose[0] # x
         rollouts[:,0,1] = pose[1] # y
         rollouts[:,0,2] = pose[2] # theta
 
         # For control trajectories, get the speed from reference point.
-        self.trajs[:,:,0] = pose_ref[3] # Update velocities
+        self.trajs[:,:,0] = max(0.5, pose_ref[3]) # Update velocities
 
         # Then step forward the K control trajectory T timesteps using
         # self.apply_kinematics
@@ -168,8 +169,8 @@ class ModelPredictiveController(BaseController):
             self.min_delta = float(rospy.get_param("trajgen/min_delta", -0.34))
             self.max_delta = float(rospy.get_param("trajgen/max_delta", 0.34))
 
-            self.K = int(rospy.get_param("mpc/K", 140))
-            self.T = int(rospy.get_param("mpc/T", 6))
+            self.K = int(rospy.get_param("mpc/K", 60))
+            self.T = int(rospy.get_param("mpc/T", 3))
 
             self.speed = float(rospy.get_param("mpc/speed", 1.0))
             self.finish_threshold = float(rospy.get_param("mpc/finish_threshold", 1.0))
@@ -187,18 +188,19 @@ class ModelPredictiveController(BaseController):
             self.shape_w = float(rospy.get_param("mpc/shape_w", 8.0))
             self.num_branches = int(rospy.get_param("mpc/num_branches", 7))
             self.pose_resol = int(rospy.get_param("mpc/pose_resolution", 2))
-            self.ENABLE_DYNAMIC_TRAJ = rospy.get_param("mpc/dynamic_traj", True)
+            self.ENABLE_DYNAMIC_TRAJ = rospy.get_param("mpc/dynamic_traj", False)
             if self.ENABLE_DYNAMIC_TRAJ:
                 self.Tlong = self.T
                 self.Tshort = 3
                 self.TRAJLIB_THRES = 1.0
+            self.ENABLE_OBS_DIST = rospy.get_param("mpc/obs_dist", False)
 
     def init_laser(self):
         self.EXCLUDE_MAX_RANGE_RAYS = True
-        self.OBS_STEPS = 3
-        self.LASER_RAY_STEP = 18
+        self.OBS_STEPS = int(rospy.get_param("mpc/obs_steps", 3))
+        self.LASER_RAY_STEP = 9
         self.MAX_RANGE_METERS = 11.0
-        self.OBS_SAFE_DIST = 0.3
+        self.OBS_SAFE_DIST = float(rospy.get_param("mpc/safe_dist", 0.3))
         assert self.OBS_STEPS <= self.T
 
         self.laser_sub = rospy.Subscriber(SCAN_TOPIC, LaserScan, self.lidar_cb, queue_size=1) # Callback at end of this file
@@ -210,9 +212,9 @@ class ModelPredictiveController(BaseController):
         self.filtered_angles = None
         self.filtered_ranges = None
         self.obs = None
-        self.obs_w = 3.0
+        self.obs_w = float(rospy.get_param("mpc/obs_w", 3.0))
 
-    def get_control_trajectories2(self):
+    def get_control_trajectories2(self, T):
         '''
         get_control_trajectories computes K control trajectories to be
             rolled out on each update step. You should only execute this
@@ -229,16 +231,11 @@ class ModelPredictiveController(BaseController):
         # TODO: INSERT CODE HERE
         # Create a trajectory library of K trajectories for T timesteps to
         # roll out when computing the best control.
-        ctrls = np.zeros((self.K, self.T, 2))
+        ctrls = np.zeros((self.K, T, 2))
         # step_size = (self.max_delta - self.min_delta) / (self.K - 1)
-
-        sd = 0.8
-        mean = 0
-        lb, ub = (self.min_delta - mean) / sd, (self.max_delta - mean) / sd
-        tnormal = truncnorm(lb, ub, loc=mean, scale=sd)
-        for i in xrange(self.T):
-            ctrls[:,i,1] = tnormal.rvs(size=self.K)  # sample from control space with truncated gaussian
-        ctrls[0,:,1] = np.zeros(self.T)
+        deltas = np.linspace(self.min_delta, self.max_delta, num=self.K, endpoint=True)
+        for i in xrange(self.K):
+            ctrls[i,:,1] = deltas[i]
         return ctrls
 
     def get_control_trajectories(self, T):
@@ -258,59 +255,11 @@ class ModelPredictiveController(BaseController):
         # TODO: INSERT CODE HERE
         # Create a trajectory library of K trajectories for T timesteps to
         # roll out when computing the best control.
+        file_path = os.path.dirname(os.path.realpath(__file__)) + '/../traj_lib/depth_{}_branch_{}_size_{}.npy'.format(T, self.num_branches, self.K)
         assert self.K in range(60, 150, 10)
-        if not os.path.exists(os.path.dirname(os.path.realpath(__file__)) + '/../traj_lib/depth_{}_branch_{}_size_{}.npy'.format(T, self.num_branches, self.K)):
-            self.precompute_traj_lib(T, self.num_branches)
-        return np.load(os.path.dirname(os.path.realpath(__file__)) + '/../traj_lib/depth_{}_branch_{}_size_{}.npy'.format(T, self.num_branches, self.K))
-        
-
-    def precompute_traj_lib(self, t, num_branches):
-        # generate dense set of paths D
-        time_start = time.time()
-        deltas = np.linspace(self.min_delta, self.max_delta, num=num_branches, endpoint=True)
-        D_size = num_branches**t
-
-        grid = np.meshgrid(*([deltas] * t), indexing='ij')
-        D = np.stack([x.flatten() for x in grid], axis=-1)
-        D = np.concatenate((D, np.zeros([1, int(t)]))) # straight
-        rospy.loginfo('dense generation time:' + str(time.time()-time_start))
-        dcache = {}  # dcache[(p1, p2)] = d(p1, p2), where p1 \in D, p2 \in S
-
-        K = range(60, 150, 10)
-        time_start = time.time()
-        # contruct subset S with (hopefully) maximum coverage
-        S = set((D_size,))  # add default to S
-        for i in xrange(1, max(K)):
-            # find path that (might) makes maximum dispersion after adding it to S
-            max_mindist = -1000000
-            new_path = None
-            for path in xrange(D_size):
-                if path not in S:
-                    min_dist = 1000000000
-                    for path_S in S:
-                        # find hausdorff distance in control space. TODO: maybe convert to state space
-                        if (path, path_S) in dcache:
-                            dist = dcache[(path, path_S)]
-                        else:
-                            p1 = D[[path]]
-                            p2 = D[[path_S]]
-                            dist = max(directed_hausdorff(p1, p2)[0], directed_hausdorff(p2, p1)[0])
-                            dcache[(path, path_S)] = dist
-                        min_dist = min(min_dist, dist)
-                    assert min_dist < 1000000000
-                    if min_dist > max_mindist:
-                        max_mindist = min_dist
-                        new_path = path
-            assert new_path != None
-            S.add(new_path)
-            if len(S) in K:
-                ctrls = np.zeros((len(S), t, 2))
-                cnt = 0
-                for path in S:
-                    ctrls[cnt,:,1] = D[path,:]
-                    cnt += 1
-                rospy.loginfo('traj selection time:' + str(time.time()-time_start))
-                np.save(os.path.dirname(os.path.realpath(__file__)) + '/../traj_lib/depth_{}_branch_{}_size_{}.npy'.format(t, num_branches, len(S)), ctrls)
+        if not os.path.exists(file_path):
+            rospy.logerr("file not exist: {}\nRun python trajutil generate <steps> <num_branches> to generate trajectories library of size in range(60, 150, 10).".format(file_path))
+        return np.load(file_path)
 
     def apply_kinematics(self, cur_x, control, dt):
         '''
@@ -339,14 +288,15 @@ class ModelPredictiveController(BaseController):
         delta = control[:,1]
 
         theta_dot = theta + (velocity / self.B * np.tan(delta)) * dt
-        x_dot = x + (self.B / (np.tan(delta)+1e-12) * (np.sin(theta_dot) - np.sin(theta))) 
+        x_dot = x + (self.B / (np.tan(delta)+1e-12) * (np.sin(theta_dot) - np.sin(theta)))
         y_dot = y + (self.B / (np.tan(delta)+1e-12) * (-np.cos(theta_dot) + np.cos(theta)))
+
         straight_idx = (np.absolute(delta) < 1e-8)
         x_dot[straight_idx] = x[straight_idx] + ((np.cos(theta))[straight_idx])*velocity[straight_idx]*dt
         y_dot[straight_idx] = y[straight_idx] + ((np.sin(theta))[straight_idx])*velocity[straight_idx]*dt
 
 
-        
+
         return (x_dot, y_dot, theta_dot)
 
     def apply_cost(self, poses, curr_pose, index):
@@ -385,10 +335,13 @@ class ModelPredictiveController(BaseController):
             shape_cost[i] = max(directed_hausdorff(ref_path, prop_path)[0], directed_hausdorff(prop_path, ref_path)[0])
         shape_cost *= self.shape_w
         error_cost = np.linalg.norm(poses[:, path_steps - 1, :2] - self.path[index, :2], axis=1) * self.error_w
-        obs_cost = self.obstacle_cost(curr_pose, poses[:,:self.OBS_STEPS*self.pose_resol+1,:]) * self.obs_w
-        rospy.loginfo('shape cost' + str(shape_cost))
-        rospy.loginfo('error cost' + str(error_cost))
-        rospy.loginfo('obs cost' + str(obs_cost))
+        if self.ENABLE_OBS_DIST:
+            obs_cost = self.obstacle_cost(curr_pose, poses[:,:self.OBS_STEPS*self.pose_resol+1,:]) * self.obs_w
+        else:
+            obs_cost = 0
+        #rospy.loginfo('shape cost' + str(shape_cost))
+        #rospy.loginfo('error cost' + str(error_cost))
+        #rospy.loginfo('obs cost' + str(obs_cost))
         return collision_cost + error_cost + shape_cost + obs_cost
 
     def check_collisions_in_map(self, poses):
@@ -525,7 +478,7 @@ class ModelPredictiveController(BaseController):
         rollouts[:,0,1] = 0
         rollouts[:,0,2] = np.pi/2
         self.trajs[:,:,0] = 2.0
-        for i in xrange(self.T):              
+        for i in xrange(self.T):
             rollouts[:,i+1,:] = np.array(self.apply_kinematics(rollouts[:,i,:], self.trajs[:,i,:], self.dt)).T
         for i in xrange(self.K):
             self.plot_path(ax, rollouts[i])
@@ -614,23 +567,23 @@ class ModelPredictiveController(BaseController):
             self.downsampled_ranges = np.array(msg.ranges[::self.LASER_RAY_STEP]) # Down sample
             self.downsampled_ranges[np.isnan(self.downsampled_ranges)] = self.MAX_RANGE_METERS # Remove nans
             self.downsampled_ranges[self.downsampled_ranges[:] == 0] = self.MAX_RANGE_METERS # Remove 0 values
-        else:    
+        else:
             # Initialize angle array
             if not isinstance(self.laser_angles, np.ndarray):
-                self.laser_angles = np.linspace(msg.angle_min, msg.angle_max, len(msg.ranges))    
+                self.laser_angles = np.linspace(msg.angle_min, msg.angle_max, len(msg.ranges))
             ranges = np.array(msg.ranges) # Get the measurements
             ranges[np.isnan(ranges)] = self.MAX_RANGE_METERS # Remove nans
             valid_indices = np.logical_and(ranges > 0.01, ranges < self.MAX_RANGE_METERS) # Find non-extreme measurements
             self.filtered_angles = np.copy(self.laser_angles[valid_indices]).astype(np.float32) # Get angles corresponding to non-extreme measurements
             self.filtered_ranges = np.copy(ranges[valid_indices]).astype(np.float32) # Get non-extreme measurements
-        
+
             ray_count = int(self.laser_angles.shape[0]/self.LASER_RAY_STEP) # Compute expected number of rays
             sample_indices = np.arange(0,self.filtered_angles.shape[0],float(self.filtered_angles.shape[0])/ray_count).astype(np.int) # Get downsample indices
             self.downsampled_angles = np.zeros(ray_count+1, dtype=np.float32) # Initialize down sample angles
             self.downsampled_ranges = np.zeros(ray_count+1, dtype=np.float32) # Initialize down sample measurements
             self.downsampled_angles[:sample_indices.shape[0]] = np.copy(self.filtered_angles[sample_indices]) # Populate downsample angles
             self.downsampled_ranges[:sample_indices.shape[0]] = np.copy(self.filtered_ranges[sample_indices]) # Populate downsample measurements
-       
+
         # Compute the observation
         # obs is a a two element tuple
         # obs[0] is the downsampled ranges

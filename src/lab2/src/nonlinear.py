@@ -10,7 +10,6 @@ class NonLinearController(BaseController):
     def __init__(self):
         super(NonLinearController, self).__init__()
 
-        
         self.reset_params()
         self.reset_state()
 
@@ -35,8 +34,8 @@ class NonLinearController(BaseController):
         y = -k_1 * e_ct * velocity * np.sin(theta_err) - k_2 * theta_err**2
         x = theta_err * velocity / self.B
         steering_angle = np.arctan(y/x) if abs(x) > 1e-8 else np.arctan(-k_1*e_ct*self.B)
-        #steering_angle = self.minimized_angle(steering_angle)
-
+        rospy.loginfo('v:{}, delta:{}, theta_err: {}'.format(velocity, steering_angle, theta_err))
+        steering_angle = np.clip(steering_angle, -0.34, 0.34) 
         return np.array([velocity, steering_angle])
 
 

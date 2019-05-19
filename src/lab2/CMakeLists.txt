@@ -51,12 +51,14 @@ add_message_files(
   FILES
   XYHV.msg
   XYHVPath.msg
+  XYHVPath_log.msg
 )
 
 ## Generate services in the 'srv' folder
 add_service_files(
   FILES
   FollowPath.srv
+  FollowPath_log.srv
 )
 
 ## Generate actions in the 'action' folder

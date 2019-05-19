@@ -35,7 +35,7 @@ class PurePursuitController(BaseController):
             dist = np.sqrt(dist)
             #print("range: ", np.min(dist),"-", np.max(dist))
             argm = np.argmin(dist)
-            print "min dist = ref[", argm, "] =", dist[argm]
+            #print "min dist = ref[", argm, "] =", dist[argm]
             closest = np.abs(dist[argm:] - self.pose_lookahead)
             # closest = np.abs(dist - self.pose_lookahead)
             # idx = np.max(closest.argsort()[:4])
