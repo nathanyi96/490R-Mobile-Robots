@@ -8,19 +8,20 @@ import pickle
 from scipy import signal
 import rospy
 import os
+import sys
 
-def saw():
+
+def saw(radius):
     t = np.linspace(0, 20, 100)
     saw = signal.sawtooth(0.5 * np.pi * t)
     configs = [[x, y, 0] for (x, y) in zip(t, saw)]
     return configs
 
 
-def circle():
+def circle(radius=2.5):
     # Offset 
     offset = np.array([[-2.1, -0.4, 0]])
     waypoint_sep = 0.1
-    radius = 2.5
     center = [0, radius]
     num_points = int((2 * radius * np.pi) / waypoint_sep)
     thetas = np.linspace(-1 * np.pi / 2, 2 * np.pi - (np.pi / 2), num_points)
@@ -28,7 +29,7 @@ def circle():
     return np.array(poses) + offset 
 
 
-def left_turn():
+def left_turn(radius):
     #offset = np.array([[-7.0, -1.7, 0]])
     offset = np.array([[0, 0, 0]])
     waypoint_sep = 0.1
@@ -44,7 +45,7 @@ def left_turn():
     return np.array(poses) + offset
 
 
-def right_turn():
+def right_turn(radius):
     waypoint_sep = 0.1
     turn_radius = 1.5
     straight_len = 10.0
@@ -58,12 +59,12 @@ def right_turn():
     return poses
 
 
-def cse022_path():
+def cse022_path(radius):
     with open(os.path.dirname(os.path.realpath(__file__)) + '/../scripts/cse022_path.pickle', 'r') as f:
         p = pickle.load(f)
     return p
 
-def single():
+def single(radius):
     poses = [[x, 0, 0] for x in xrange(10)]
     print poses
     return poses
@@ -74,14 +75,20 @@ plan_names = ['circle', 'left turn', 'right turn', 'saw', 'cse022 real path', 's
 
 def generate_plan():
     print "Which plan would you like to generate? "
+    r = 2.5
     for i, name in enumerate(plan_names):
         print "{} ({})".format(name, i)
-    index = int(raw_input("num: "))
+    if len(sys.argv) > 1:
+        index = int(sys.argv[1])
+    if len(sys.argv) > 3:
+        r = float(sys.argv[3])
+    if len(sys.argv) == 1:
+        index = int(raw_input("num: "))
     if index >= len(plan_names):
         print "Wrong number. Exiting."
         exit()
     path_name = plan_names[index]
-    return plans[plan_names[index]](), path_name
+    return plans[plan_names[index]](r), path_name
 
 def generate_all_plan():
     print "Which plan would you like to generate? "
@@ -97,10 +104,13 @@ if __name__ == '__main__':
     if type(configs) == XYHVPath:
         rospy.loginfo('022 path called')
         path = configs
+
     else:
         h = Header()
         h.stamp = rospy.Time.now()
         desired_speed = 2.0 # 0.5
+        if len(sys.argv) > 2:
+            desired_speed = float(sys.argv[2])
         ramp_percent = 0.1
         ramp_up = np.linspace(0.0, desired_speed, int(ramp_percent * len(configs)))
         ramp_down = np.linspace(desired_speed, 0.3, int(ramp_percent * len(configs)))

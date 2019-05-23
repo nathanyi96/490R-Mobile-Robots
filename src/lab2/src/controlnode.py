@@ -13,6 +13,7 @@ from lab2.msg import XYHVPath, XYHVPath_log
 from lab2.srv import FollowPath, FollowPath_log
 from visualization_msgs.msg import Marker
 
+import csv
 import mpc
 import nonlinear
 import pid
@@ -61,9 +62,38 @@ class ControlNode:
     def log_error(self):
         rospy.loginfo(self.path_name)
         rospy.loginfo(self.initialpose[0])
-        with open(os.path.dirname(os.path.realpath(__file__)) + '/lab2_performance_log.txt', 'a+') as f:
-            f.write('controller: {}, average error: {}, path: {}, init pose: ({},{},{})\n'.format(
-            self.controller_type, self.error_logger.avg, self.path_name, self.initialpose[0], self.initialpose[1], self.initialpose[2]))
+        kp = float(rospy.get_param("/pid/kp", 3.0)) # 0.65
+        kd = float(rospy.get_param("/pid/kd", 2.0)) # 0.8
+        L = float(rospy.get_param("/purepursuit/pose_lookahead", 1.0))
+        K = int(rospy.get_param("/mpc/K", 140))
+        T = int(rospy.get_param("/mpc/T", 5))
+        k1 = float(rospy.get_param("/lyapunov/k1", 5.0))
+        k2 = float(rospy.get_param("/lyapunov/k2", 10.0))
+        # with open(os.path.dirname(os.path.realpath(__file__)) + 'lab2_performance_log.txt', 'a+') as f:
+        #     # writer = csv.writer(f, delimiter=' ')
+        #     f.write('{}, {}, {}, {}, {}, {}, {}, {}\n'.format(
+        #     self.controller_type, self.error_logger.avg, self.path_name, self.initialpose[0], self.initialpose[1],
+        #     self.initialpose[2], kp, kd))
+        if self.controller_type == 'PID':
+            with open(os.path.dirname(os.path.realpath(__file__)) + '/pid_experiments_log.csv', 'a+') as f:
+                f.write('{}, {}, {}, {}, {}, {}, {}, {}\n'.format(
+                self.controller_type, self.error_logger.avg, self.path_name, self.initialpose[0], self.initialpose[1],
+                self.initialpose[2], kp, kd))
+        elif self.controller_type == 'PP':
+            with open(os.path.dirname(os.path.realpath(__file__)) + '/pp_r_v_experiments_log.csv', 'a+') as f:
+                f.write('{}, {}, {}, {}, {}, {}, {} \n'.format(
+                self.controller_type, self.error_logger.avg, self.path_name, self.initialpose[0], self.initialpose[1],
+                self.initialpose[2], L))
+        elif self.controller_type == 'MPC':
+            with open(os.path.dirname(os.path.realpath(__file__)) + '/mpc_experiments_log.csv', 'a+') as f:
+                f.write('{}, {}, {}, {}, {}, {}, {}, {}\n'.format(
+                self.controller_type, self.error_logger.avg, self.path_name, self.initialpose[0], self.initialpose[1],
+                self.initialpose[2], K, T))
+        elif self.controller_type == 'NL':
+            with open(os.path.dirname(os.path.realpath(__file__)) + '/NL_experiments_log.csv', 'a+') as f:
+                f.write('{}, {}, {}, {}, {}, {}, {}, {}\n'.format(
+                self.controller_type, self.error_logger.avg, self.path_name, self.initialpose[0], self.initialpose[1],
+                self.initialpose[2], k1, k2))
         self.error_logger.reset()
 
     def start(self, name):
@@ -92,7 +122,7 @@ class ControlNode:
                 if next_ctrl is not None:
                     self.publish_ctrl(next_ctrl)
                 if self.controller.path_complete(ip, error):
-                    self.log_error()                   
+                    # self.log_error()                   
                     self.path_event.clear()
             self.reset_lock.release()
             rate.sleep()
@@ -114,12 +144,12 @@ class ControlNode:
 
         rospy.Subscriber("/initialpose",
                 PoseWithCovarianceStamped, self.cb_init_pose, queue_size=1)
-        # rospy.Subscriber("/controller/set_path",
-        #         XYHVPath, self.cb_path, queue_size=1)
         rospy.Subscriber("/controller/set_path",
-                XYHVPath_log, self.cb_path_log, queue_size=1)
-        # rospy.Service("/controller/follow_path", FollowPath, self.cb_path)
-        rospy.Service("/controller/follow_path_log", FollowPath_log, self.cb_path_log)
+                 XYHVPath, self.cb_path, queue_size=1)
+        # rospy.Subscriber("/controller/set_path",
+        #         XYHVPath_log, self.cb_path_log, queue_size=1)
+        rospy.Service("/controller/follow_path", FollowPath, self.cb_path)
+        #rospy.Service("/controller/follow_path_log", FollowPath_log, self.cb_path_log)
         rospy.Subscriber(rospy.get_param("~pose_topic", "/sim_car_pose/pose"),
                              PoseStamped, self.cb_pose, queue_size=10)
 
@@ -289,5 +319,5 @@ class ControlNode:
         self.rp_cte.publish(Float32(cte))
 
     def cb_init_pose(self, pose):
-        self.initialpose = utils.rospose_to_posetup_(pose)
+        # self.initialpose = utils.rospose_to_posetup_(pose)
         self.path_event.set()

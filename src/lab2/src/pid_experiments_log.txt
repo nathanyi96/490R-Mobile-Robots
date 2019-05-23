@@ -1,0 +1,5 @@
+controller: PID, average error: 0.59484293197, path: circle, init pose: (-1.6,0.2,0.7) kp: 0.15 kd: 0.2 
+controller: PID, average error: 0.612947607625, path: circle, init pose: (-1.6,0.2,0.7) kp: 0.15 kd: 0.2 
+controller: PID, average error: 0.648867112832, path: circle, init pose: (-1.6,0.2,0.7) kp: 0.15 kd: 0.2 
+controller: PID, average error: 0.642801555019, path: circle, init pose: (-1.6,0.2,0.7) kp: 0.15 kd: 0.2 
+controller: PID, average error: 0.629278979185, path: circle, init pose: (-1.6,0.2,0.7) kp: 0.15 kd: 0.2 

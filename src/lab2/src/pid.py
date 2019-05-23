@@ -36,7 +36,7 @@ class PIDController(BaseController):
             # else:
             dist = np.sqrt(np.sum(((self.path[:,0:2] - pose[0:2])**2), axis=1))
             # Find reference point with minimum, then return next point since robot may be ahead
-            return np.argmin(dist)  # or +1 to make sure ref is ahead of current pos
+            return np.argmin(dist)#+5)%self.path.shape[0]  # or +1 to make sure ref is ahead of current pos
 
 
     def get_control(self, pose, index):
@@ -88,7 +88,7 @@ class PIDController(BaseController):
         '''
         with self.path_lock:
             self.kp = float(rospy.get_param("/pid/kp", 3.0)) # 0.65
-            self.kd = float(rospy.get_param("/pid/kd", 1.0)) # 0.8
+            self.kd = float(rospy.get_param("/pid/kd", 2.0)) # 0.8
             self.finish_threshold = float(rospy.get_param("/pid/finish_threshold", 0.2))
             self.exceed_threshold = float(rospy.get_param("/pid/exceed_threshold", 4.0))
             self.waypoint_lookahead = float(rospy.get_param("/pid/waypoint_lookahead", 0.6))

@@ -127,8 +127,8 @@ class ModelPredictiveController(BaseController):
 
         # Return the controls which yielded the min cost.
         #rospy.loginfo(str(rollouts[min_control]))
-        #self.visualize_selected_traj(rollouts[min_control])
-        rosviz.viz_paths_cmap(rollouts, costs, cmap='seismic')
+        self.visualize_selected_traj(rollouts[min_control])
+        #rosviz.viz_paths_cmap(rollouts, costs, cmap='seismic')
         return self.trajs[min_control][0]
 
     def reset_state(self):
@@ -169,7 +169,7 @@ class ModelPredictiveController(BaseController):
             self.min_delta = float(rospy.get_param("trajgen/min_delta", -0.34))
             self.max_delta = float(rospy.get_param("trajgen/max_delta", 0.34))
 
-            self.K = int(rospy.get_param("mpc/K", 60))
+            self.K = int(rospy.get_param("mpc/K", 140))
             self.T = int(rospy.get_param("mpc/T", 5))
 
             self.speed = float(rospy.get_param("mpc/speed", 1.0))
@@ -188,7 +188,7 @@ class ModelPredictiveController(BaseController):
             self.shape_w = float(rospy.get_param("mpc/shape_w", 8.0))
             self.num_branches = int(rospy.get_param("mpc/num_branches", 7))
             self.pose_resol = int(rospy.get_param("mpc/pose_resolution", 2))
-            self.ENABLE_DYNAMIC_TRAJ = rospy.get_param("mpc/dynamic_traj", False)
+            self.ENABLE_DYNAMIC_TRAJ = rospy.get_param("mpc/dynamic_traj", True)
             if self.ENABLE_DYNAMIC_TRAJ:
                 self.Tlong = self.T
                 self.Tshort = 3
@@ -335,6 +335,7 @@ class ModelPredictiveController(BaseController):
             prop_path = poses[i,:,:2]
             shape_cost[i] = max(directed_hausdorff(ref_path, prop_path)[0], directed_hausdorff(prop_path, ref_path)[0])
         shape_cost *= self.shape_w
+        
         error_cost = np.linalg.norm(poses[:, path_steps - 1, :2] - self.path[index, :2], axis=1) * self.error_w
         if self.ENABLE_OBS_DIST:
             obs_cost = self.obstacle_cost(curr_pose, poses[:,:self.OBS_STEPS*self.pose_resol+1,:]) * self.obs_w

@@ -20,9 +20,9 @@ def circle():
     # Offset 
     offset = np.array([[-2.1, -0.4, 0]])
     waypoint_sep = 0.1
-    radius = 2.5
+    radius = 2.5 # 1, 5, 10
     center = [0, radius]
-    num_points = int((2 * radius * np.pi) / waypoint_sep)
+    num_points = int((2 * radius * np.pi) / waypoint_sep) 
     thetas = np.linspace(-1 * np.pi / 2, 2 * np.pi - (np.pi / 2), num_points)
     poses = [[radius * np.cos(theta) + center[0], radius * np.sin(theta) + center[1], theta + (np.pi / 2)] for theta in thetas]
     return np.array(poses) + offset 
@@ -92,14 +92,14 @@ def generate_all_plan():
 if __name__ == '__main__':
     rospy.init_node("controller_runner")
     configs = generate_plan()
-
+    
     if type(configs) == XYHVPath:
         rospy.loginfo('022 path called')
         path = configs
     else:
         h = Header()
         h.stamp = rospy.Time.now()
-        desired_speed = 0.5 # 0.5
+        desired_speed = 2.0 # 0.5
         ramp_percent = 0.1
         ramp_up = np.linspace(0.0, desired_speed, int(ramp_percent * len(configs)))
         ramp_down = np.linspace(desired_speed, 0.3, int(ramp_percent * len(configs)))

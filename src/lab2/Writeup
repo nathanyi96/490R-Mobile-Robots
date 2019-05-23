@@ -5,46 +5,43 @@ Contents to be used for writeup.
 6.
 	(a)
   		i.
-    		A.	The PID controller cross track and theta error converged to 0 relatively quickly with the default proportational and derivative		constants.
-    			<Insert graph>
-    		B.	The metrics we used was cross track error throughout time.
-    			<Insert graph>
-    		C.	The summation of cross track and theta error was slightly optimized, but as mentioned beforehand, the default constants allowed 
-    			the PID controller's cross track and theta error to converge to 0 relatively quickly.
+    		A.	The PID controller cross track and theta error converged to 0 relatively quickly with the default proportational and derivative	constants in a staight-line path. However, the initial parameters are not able to make cross track error converge to 0 in time at places of sharp turns.
+    			<Insert graph from experiments/pid/kp015_kd020>
+    		B.	The metrics we used includes cross track error throughout time, convergence rate, and whether overshoot happened.
+    		C.	The summation of cross track and theta error was optimized by good extent and the car is able to keep up with the reference on the desired path.
     			<Insert graph>
     		D.	We noticed that increasing K_p too much tends to cause the robot to overshoot its set point and oscillate about the path
     			waypoints. However, decreasing K_p too much tends causes slow convergence. As for K_d, we noticed that increasing K_d too much causes slow convergence and that decreasing K_d too much causes oscillating behavior.
     			<Insert graph>
     	ii.	 The final K_p value is 3.0, and the final K_d value is 1.0.
-    	iii. Using sin(theta_error) allows the PID controller to be less susceptible to noise, so we used the analytical derivative instead of the 
-    		 numerical approximation of the error derivative.
+    	iii. Using sin(theta_error) allows the PID controller to be less susceptible to noise, so we used the analytical derivative instead of the numerical approximation of the error derivative.
     (b)
     	i.
-    		A.	We noticed that increasing the lookahead distance tends to improve the robustness of the robot in that the controller was able to 
-    			minimize cross track and theta error. When the lookahead distance is too little, the controller causes the robot to oscillate about the path due to computed steering angle being too large. We noticed that lookahead distances approximately less than 1.0 meters(?) causes performance to suffer.
+    		A.	We noticed that increasing the lookahead distance tends to improve the robustness of the robot in that the controller was able to
+    			minimize cross track and theta error. However, if the lookahead distance is too large, it's very slow for the controller to converge the cross track error and heading error to zero. When the lookahead distance is too little, the controller causes the robot to oscillate about the path due to computed steering angle being too large. We noticed that lookahead distances less than 1.0 meters causes performance to suffer.
     		B.
 
     (c)
-        i. 
+        i.
             A.  The trajectory plot is generated and put in the folder 'plot'. <Insert graph>
-            B.  In simulation we uses ... as K and 3 and 5 as T for the model to dynamically switch libraries.
+            B.  In simulation we uses 140 as K and 3 and 5 as T for the model to dynamically switch libraries.
                 When the car has large position error, it would apply short library to quickly catch up, in other
                 cases it would use longer trajectory library to search for optimal path.
         ii.
             A.  We add a new cost function called shape cost, which is defined as the hausdorff distance between the trajectory and
                 the truncated reference path. To find the reference path, we simply take the reference index (which is the closest pose
-                in the path), and extend it in certain length. In normal cases, we multiply its current velocity with the number of time steps
-                in our trajectory library to compute the end index, and take all indexes from current index to the end index to be 
+                in the path), and extend it in a certain length. In normal cases, we multiply its current velocity with the number of time steps
+                in our trajectory library to compute the end index, and take all indexes from current index to the end index to be
                 the reference path. In cases near the end, we just extend reference path in its current direction for similar distance, and collect
                 the way points. Once we have the reference path and our trajectory, our shape costs would be the hausdorff distance between them, which
                 intuitively measures how much dispersion does our path have with respect to the reference. This cost is more robust than just measuring
                 the distance of the end position, and it provides solid information for measuring the quality of a path.
             B.  We first realized that there're various cases where just comparing the distance of the end point in the trajectory with reference will fail.
-                For instance, the information of shape of path and middle way points are not considered, which makes the car fail to converge well even in 
+                For instance, the information of shape of path and middle way points are not considered, which makes the car fail to converge well even in
                 straight line. So we came up with the shape costs and saw that the car model won't converge at the end of the path.
                 Then, we realized that it's worth adding an edge case for extending the path.
             C.  Yes, the records of tuning the gains are in...
-            D.  The heatmap is created ... 
+            D.  The heatmap is created ...
         iii.
             Since we add the shape costs to our cost functions, we end up not using any lookahead strategy in finding reference pose.
     (d).
@@ -54,15 +51,15 @@ Contents to be used for writeup.
         (3). PID is the controller that requires lots of tuning, but in real world it works decently well.
         (4). Pure pursuit works well in high speed regime, because it has a look ahead strategy. In real world, it can smoothly make turns
              compared with other controllers.
-    
+
     (Extra Credits) Avoiding real obstacles with MPC:
         The code and the videos can be found in..
         The algorithm for the obstacle distance costs are: (1). Based on laser scan and safety threshold, find potential obstacle points by backprojection on range and angles.
         (2). For each trajectory, compute the euclidean distance of all pairs of the waypoints and the obstacle points. (3). Weight this cost and combine with the original cost
-        to find the best trajectory. After we added this cost, the car is able to keep away from the obstacle in addition to avoiding them. Moreover, the spontaneous response 
-        enable the robot to turn much earlier before hitting the obstacles. 
+        to find the best trajectory. After we added this cost, the car is able to keep away from the obstacle in addition to avoiding them. Moreover, the spontaneous response
+        enable the robot to turn much earlier before hitting the obstacles.
 
-    (Extra Credits) Non-linear Control: 
+    (Extra Credits) Non-linear Control:
         The answer can be found in CSE_490R_LAB2.pdf.
 
 

@@ -6,3 +6,15 @@ PID
 5. kp=3.00, kd=0.50
 6. kp=3.00, kd=1.00
 7. kp=3.00, kd=2.00
+
+Purepursuit
+1. lookahead=0.5
+2. lookahead=1.0
+3. lookahead=1.5
+
+
+MPC
+1. T=3, K=60
+2. T=3, K=140
+3. T=5, K=140
+4. T=6, K=140
