@@ -122,7 +122,7 @@ class ControlNode:
                 if next_ctrl is not None:
                     self.publish_ctrl(next_ctrl)
                 if self.controller.path_complete(ip, error):
-                    # self.log_error()                   
+                    # self.log_error()
                     self.path_event.clear()
             self.reset_lock.release()
             rate.sleep()
@@ -230,8 +230,10 @@ class ControlNode:
         self.inferred_pose = utils.rospose_to_posetup(msg.pose.pose)
 
     def cb_path(self, msg):
+
         rospy.loginfo("Got path!")
         path = msg.path.waypoints
+        print("path", path)
         self.visualize_path(path)
         self.controller.set_path(path)
         self.path_event.set()
@@ -241,6 +243,7 @@ class ControlNode:
     def cb_path_log(self, msg):
         rospy.loginfo("Got path!!")
         path = msg.path.waypoints
+        rospy.loginfo('path'+str(path))
         self.path_name = msg.path_name
         rospy.loginfo(self.path_name)
         self.visualize_path(path)

@@ -1,7 +1,8 @@
 <launch>
   	<arg name="controller" default="PID" />
-    <arg name="map_file" default="$(find lab2)/maps/sandbox.yaml" />
-    <node pkg="map_server" name="map_server" type="map_server" args="$(arg map_file)"/>
+    <arg name="map_file" default="$(find lab3)/maps/cse022_w_obstacles.yaml" />
+    <node pkg="map_server" name="map_server" type="map_server" args="$(arg map_file)" ns="/obs"/>
+
     <param name="/controller/type" value="$(arg controller)"/>
     <node pkg="lab2" name="controller" type="main.py"/>
 </launch>

@@ -23,9 +23,11 @@ class Sampler:
         x = np.random.randint(self.xlimit[0], self.xlimit[1], num_samples)
         y = np.random.randint(self.ylimit[0], self.ylimit[1], num_samples)
         samples = np.stack((x, y), axis=1)
-        '''
-        samples = np.array(h.halton(2, num_samples)).T
-
-        '''
+        
+        # samples = np.array(h.halton(2, num_samples))
+        # start = np.array([[self.xlimit[0], self.ylimit[0]]])
+        # end = np.array([[self.xlimit[1], self.ylimit[1]]])
+        # samples = start + (end - start - 1) * samples
+        # samples = samples.astype(np.int)
 
         return samples

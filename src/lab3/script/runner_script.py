@@ -92,7 +92,7 @@ def generate_all_plan():
 if __name__ == '__main__':
     rospy.init_node("controller_runner")
     configs = generate_plan()
-
+    load_flag = False
     if type(configs) == XYHVPath:
         rospy.loginfo('022 path called')
         path = configs
@@ -111,7 +111,16 @@ if __name__ == '__main__':
         speeds[-len(ramp_down):] = ramp_down
         path = XYHVPath(h, [XYHV(*[config[0], config[1], config[2], speed]) for config, speed in zip(configs, speeds)])
 
-    print("path", path)
+        if load_flag:
+            print("load")
+            with open("path.pkl",'rb') as f:
+                configs = pickle.load(f)
+                print(configs)
+                path = XYHVPath(h, [XYHV(*[config[0], config[1], config[2], speed])
+                    for config, speed in zip(configs, speeds)])
+
+
+#    print("path", path)
     print "Sending path..."
     controller = rospy.ServiceProxy("/controller/follow_path", FollowPath())
     success = controller(path)

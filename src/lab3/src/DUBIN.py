@@ -9,6 +9,12 @@ class DubinsMapEnvironment(MapEnvironment):
     def __init__(self, map_data, curvature=5):
         super(DubinsMapEnvironment, self).__init__(map_data)
         self.curvature = curvature
+        # self.vectorized_func = self.vectorize(vectorize_compute_distances)
+
+    def vectorize_compute_distances(self, end_config, start_config):
+        end_config, start_config = np.array(end_config), np.array(start_config)
+        curvature = 1 / ((np.sqrt(np.sum((end_config[:,0:2]-start_config[0:2].reshape(1,-1))**2)), axis=1) / 2) # Curvature = 1 / radius
+        _, distance = dubin_path_planning(start_config, end_config, curvature)
 
     def compute_distances(self, start_config, end_configs):
         """
@@ -17,13 +23,12 @@ class DubinsMapEnvironment(MapEnvironment):
         @param end_configs: list of tuples of end confings
         @return numpy array of distances
         """
-        start_config, end_configs = np.array(start_config), np.array(end_configs)
-        num = end_configs.shape[0]
-        distances = np.zeros((num, 1))
+
         # Implement here
-        for i in range(num):
-            _,_,_, distance = dubins_path_planning(start_config, end_configs[i], self.curvature)
-            distances[i] = distance
+
+        #distances = self.vectorize_compute_distances(end_configs, start_config)
+
+        _, distances = self.vectorize_compute_distances(end_configs, start_config)
         return distances
 
     def compute_heuristic(self, config, goal):
@@ -33,8 +38,9 @@ class DubinsMapEnvironment(MapEnvironment):
 
         # Implement here
 
-        config, goal = np.array(config), np.array(goal)
-        _,_,_, heuristic = dubins_path_planning(config, goal, self.curvature)
+        curvature = 1 / (np.linalg.norm(np.array(goal) - np.array(config)) / 2) # Curvature = 1 / radius
+        _, heuristic = dubins_path_planning(config, goal, curvature)
+
         return heuristic
 
     def generate_path(self, config1, config2):
@@ -47,6 +53,9 @@ class DubinsMapEnvironment(MapEnvironment):
 
         # Implement here
 
-        ppx, ppy, ppyaw, path_length = dubins_path_planning(config1, config2, self.curvature)
-        path = np.stack((ppx, ppy, ppyaw), axis=1)
-        return path, path_length
+        curvature = 1 / (np.sqrt(np.sum(((np.subtract(config2, config1))**2)), axis=1) / 2) # Curvature = 1 / radius
+        x_path, y_path, theta_path, path_length = dubins_path_planning(config1, config2, curvature) 
+        path = np.array([x_path, y_path, theta_path])
+        clen = path_length
+
+        return path, clen

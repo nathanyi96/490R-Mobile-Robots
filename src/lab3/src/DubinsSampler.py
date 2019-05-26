@@ -15,10 +15,12 @@ class DubinsSampler:
         @return 2D numpy array of size [num_samples x 3]
         """
 
-        x_samples = np.random.uniform(self.xlimit[0], self.xlimit[1], num_samples)
-        y_samples = np.random.uniform(self.ylimit[0], self.ylimit[1], num_samples)
-        theta_samples = np.random.uniform(0, np.pi, num_samples)
-        
+        #x_samples = np.random.uniform(self.xlimit[0], self.xlimit[1], num_samples)
+        #y_samples = np.random.uniform(self.ylimit[0], self.ylimit[1], num_samples)
+        x_samples = np.random.randint(self.xlimit[0], self.xlimit[1], num_samples)
+        y_samples = np.random.randint(self.ylimit[0], self.ylimit[1], num_samples)
+        theta_samples = np.random.uniform(0, 2*np.pi, num_samples)
+
         samples = np.stack((x_samples, y_samples, theta_samples), axis=1)
 
         # Implement here

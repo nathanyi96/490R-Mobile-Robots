@@ -91,17 +91,14 @@ class ROSPlanner:
 
         print("Ready to take goals")
         self.curvature = curvature
-
-        debug_plan = False
-        if debug_plan:
-            self.new_goal = False
-            self.path_nodes = None
-            while not rospy.is_shutdown():
-                if self.new_goal:
-                    self.planning_env.visualize_plan(self.G, self.path_nodes,
-                            tuple(self.start),tuple(self.goal))
-                    self.new_goal = False
-        rospy.spin()
+        self.new_goal = False
+        self.path_nodes = None
+        while not rospy.is_shutdown():
+            if self.new_goal:
+                self.planning_env.visualize_plan(self.G, self.path_nodes,
+                        tuple(self.start),tuple(self.goal))
+                self.new_goal = False
+        #rospy.spin()
 
     def plan_to_goal(self, start, goal):
         """
@@ -125,16 +122,16 @@ class ROSPlanner:
         path = None
         for i in range(np.shape(path_nodes)[0]-1):
             seg = self.planning_env.generate_path(path_nodes[i], path_nodes[i+1])[0]
-            if np.any(path == None):
+            if path == None:
                 path = seg
             else:
                 path = np.concatenate((path, seg), axis=0)
+        print("save path:")
 
-        #print("save path:")
-        #if True:
-        #    fileObject = open("path.pkl", 'wb')
-        #    pickle.dump(path, fileObject)
-        #    fileObject.close()
+        if True:
+            fileObject = open("path.pkl", 'wb')
+            pickle.dump(path, fileObject)
+            fileObject.close()
 
         return path
 
@@ -143,7 +140,17 @@ class ROSPlanner:
         Plan a route from start to self.goals
         Return a path connecting them.
         """
-        ## need test
+        # Implement here
+        # Plan with lazy_astar
+        #path = []
+        #start_point = start
+        #end_point = self.goals[0]
+
+        #for i in range(len(self.goals) - 1):
+        #    path += lazy_astar(start_point, end_point)
+        #    start_point = end_point
+        #    end_point = self.goals[i + 1]
+
         path = [] # contains nodes
         if self.goals.shape[0] > 1:
             print("start plan multiple goals")
@@ -154,10 +161,6 @@ class ROSPlanner:
         return path
 
     def get_goal(self, msg):
-        """
-        - plan in map frame  - execute in world frame
-        don't forget tranform back to world frame
-        """
         print("Got a new goal\n{}".format(msg.pose))
         goal_pose = util.rospose_to_posetup(msg.pose)
         self.goal = self.world2map(np.array([goal_pose]))[0]
@@ -166,7 +169,7 @@ class ROSPlanner:
         self.start = self.world2map(np.array([start_pose]))[0]
         print("goal and start:", self.goal, self.start)
 
-        map_points = None
+        world_points = None
 
         if self.multi_goals:
             if self.route_sent:
@@ -175,15 +178,15 @@ class ROSPlanner:
             self.goals += [self.goal.copy()]
             if len(self.goals) == self.num_goals:
                 print("Got the final goal for mutli goal. Planning for multiple goals")
-                map_points = self.plan_multi_goals(self.start)
+                world_points = self.plan_multi_goals(self.start)
             else:
                 print("Got {}/{} goals.".format(len(self.goals), self.num_goals))
         else:
             print("start single goal")
-            map_points = self.plan_to_goal(self.start, self.goal)
-        if map_points is not None and len(map_points) > 0:
-            world_points = self.map2world(map_points)
+            world_points = self.plan_to_goal(self.start, self.goal)
+        if world_points is not None and len(world_points) > 0:
             success = self.send_path(np.array(world_points))
+
             print("Sent path")
 
     def get_current_pose(self, msg):
@@ -201,6 +204,7 @@ class ROSPlanner:
         path = XYHVPath(h,[XYHV(*[waypoint[0], waypoint[1], waypoint[2], speed]) \
                 for waypoint, speed in zip(waypoints, speeds)])
 
+        #print("path",path)
         print "Sending path..."
         controller = rospy.ServiceProxy("/controller/follow_path", FollowPath())
         success = controller(path)
@@ -276,7 +280,7 @@ class ROSPlanner:
       poses: Pixel poses in the map. Should be a nx3 numpy array
       map_info: Info about the map (returned by get_map)
     '''
-    def map2world(self, poses):
+    def map_to_world(self, poses):
         scale = self.map.info.resolution
         angle = -self.map_angle
 
@@ -292,11 +296,34 @@ class ROSPlanner:
         poses[:,:2] *= float(scale)
 
         # Translate
-        poses[:,0] += self.map_x
-        poses[:,1] += self.map_y
+        poses[:,0] += map_info.origin.position.x
+        poses[:,1] += map_info.origin.position.y
         poses[:,2] += angle
 
-        return poses
+    '''
+    Convert array of poses in the world to pixel locations in the map image
+      pose: The poses in the world to be converted. Should be a nx3 numpy array
+      map_info: Info about the map (returned by get_map)
+    '''
+    def world_to_map(poses, map_info):
+
+        scale = map_info.resolution
+        angle = -quaternion_to_angle(map_info.origin.orientation)
+
+        # Translation
+        poses[:,0] -= map_info.origin.position.x
+        poses[:,1] -= map_info.origin.position.y
+
+        # Scale
+        poses[:,:2] *= (1.0/float(scale))
+        # Rotation
+        c, s = np.cos(angle), np.sin(angle)
+
+        # Store the x coordinates since they will be overwritten
+        temp = np.copy(poses[:,0])
+        poses[:,0] = c*poses[:,0] - s*poses[:,1]
+        poses[:,1] = s*temp       + c*poses[:,1]
+        poses[:,2] += angle
 
 
 

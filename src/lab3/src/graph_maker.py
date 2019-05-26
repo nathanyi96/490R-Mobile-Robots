@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pickle
 import os
+import IPython
 
 assert(nx.__version__ == '2.2' or nx.__version__ == '2.1')
 
@@ -61,7 +62,9 @@ def make_graph(env, sampler, connection_radius, num_vertices, lazy=False, saveto
             if j != i and distance_between_nodes < connection_radius: # Don't connect node to itself and only connect to nearest neighbors within radius
                 neighbor_vertex_tuple = tuple(vertices[j])
                 if lazy:
-                    G.add_weighted_edges_from([(i, j, edge_weight)])
+                    # G.add_weighted_edges_from([(i, j, edge_weight)])
+                    path, edge_weight = env.generate_path(vertex_tuple, neighbor_vertex_tuple) ## why don't just use distance_between_nodes ?
+                    edges_list.append((vertex_tuple, neighbor_vertex_tuple, edge_weight))
                 else:
                     edge_is_valid, edge_weight = env.edge_validity_checker(vertex_tuple, neighbor_vertex_tuple)
                     if edge_is_valid:

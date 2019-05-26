@@ -4,7 +4,8 @@ from heapq import heappush, heappop
 from itertools import count
 import numpy as np
 import networkx as nx
-
+import graph_maker
+import IPython
 def astar_path(G, source, target, weight, heuristic=None):
     """Return a list of nodes in a shortest path between source and target
     using the A* ("A-star") algorithm.
@@ -40,6 +41,12 @@ def astar_path(G, source, target, weight, heuristic=None):
 
     if source not in G or target not in G:
         msg = 'Either source {} or target {} is not in G'
+        #msg = 'add source {} and target {} to G'
+        #G, start_id = graph_maker.add_node(G, source, env=planning_env,
+        #        connection_radius=args.connection_radius)
+        #G, goal_id = graph_maker.add_node(G, target, env=planning_env,
+        #        connection_radius=args.connection_radius)
+        #print(msg.format(source,target))
         raise nx.NodeNotFound(msg.format(source, target))
 
     if heuristic is None:
@@ -82,15 +89,13 @@ def astar_path(G, source, target, weight, heuristic=None):
         if curnode in explored:
             continue
 
-        # Lazy A* modification. Edge checking
-        validity, wght = weight(parent, currnode)
-        if not validity:
-            continue
-
         explored[curnode] = parent
 
         for neighbor, w in G[curnode].items():
             if neighbor in explored:
+                continue
+            validity, _ = weight(neighbor, curnode)
+            if not validity:
                 continue
             ncost = dist + w.get('weight', 1)
             if neighbor in enqueued:

@@ -1,6 +1,6 @@
 import numpy as np
 from matplotlib import pyplot as plt
-
+import IPython
 class MapEnvironment(object):
 
     def __init__(self, map_data, stepsize=0.5):
@@ -16,7 +16,7 @@ class MapEnvironment(object):
         self.limit = np.array([self.xlimit, self.ylimit])
         self.maxdist = np.float('inf')
         self.stepsize = stepsize
-
+        print()
         # Display the map.
         plt.imshow(self.map, interpolation='nearest', origin='lower')
         plt.savefig('map.png')
@@ -55,19 +55,22 @@ class MapEnvironment(object):
         y = np.array(y, dtype=int)
 
         #print(configs)
-        x_1 = (x < self.xlimit[1] - 1) * (x > self.xlimit[0])
-        y_1 = (y < self.ylimit[1] - 1) * (y > self.ylimit[0])
+        x_1 = (x < self.xlimit[1] ) * (x >= self.xlimit[0])
+        y_1 = (y < self.ylimit[1] ) * (y >= self.ylimit[0])
         check1 = x_1 * y_1
         # 2. Check collision
+        x = np.clip(x, self.xlimit[0], self.xlimit[1] - 1)
+        y = np.clip(y, self.ylimit[0], self.ylimit[1] - 1)
         check2 = self.map[x,y] == 0 ## cuz map is an array. if use random.uniform, it's double
         validity = check1 * check2
-        #print(validity)
         return validity
 
     def edge_validity_checker(self, config1, config2):
         """
         Checks whether the path between config 1 and config 2 is valid
         """
+        config1 = np.array(config1)
+        config2 = np.array(config2)
         path, length = self.generate_path(config1, config2)
         if length == 0:
             return False, 0
@@ -85,8 +88,8 @@ class MapEnvironment(object):
         """
         # Implement here
 
-        heuristic = np.sqrt(np.sum(((np.subtract(goal, config))**2))) # Essentially same as self.compute_distances??
-        # np.linalg.norm(goal - config, axis=1)
+        heuristic =  np.linalg.norm(np.array(goal)[0:2] - np.array(config)[0:2]) # Essentially same as self.compute_distances??
+        # np.linalg.norm(np.array(goal) - np.array(config), axis=1)
         return heuristic
 
     def compute_distances(self, start_config, end_configs):
@@ -97,13 +100,13 @@ class MapEnvironment(object):
         @return 1D  numpy array of distances
         """
 
-        distances = np.sqrt(np.sum(((np.subtract(end_configs, start_config))**2), axis=1)) # np.linalg.norm(end_configs - start_config, axis=1)
+        distances = np.linalg.norm(np.array(end_configs)[:,0:2] - np.array(start_config)[0:2], axis=1)
 
         return distances
 
     def generate_path(self, config1, config2):
-        config1 = np.array(config1)
-        config2 = np.array(config2)
+        config1 = np.array(config1)[0:2]
+        config2 = np.array(config2)[0:2]
         dist = np.linalg.norm(config2 - config1)
         if dist == 0:
             return config1, dist
@@ -159,7 +162,7 @@ class MapEnvironment(object):
         return waypoints
 
 
-    def visualize_plan(self, G, path_nodes, saveto=""):
+    def visualize_plan(self, G, path_nodes, start=None, goal=None, saveto=""):
         '''
         Visualize the final path
         @param plan Sequence of states defining the plan.
@@ -187,8 +190,13 @@ class MapEnvironment(object):
 
         for vertex in G.nodes:
             #config = G.nodes[vertex]["config"]
-            config = vertex
-            plt.scatter(config[1], config[0], s=10, c='r')
+            if vertex == start:
+                plt.scatter(vertex[1], vertex[0], s=30, c='b')
+            elif vertex == goal:
+                # Color the goal node with green
+                plt.scatter(vertex[1], vertex[0], s=30, c='g')
+            else:
+                plt.scatter(vertex[1], vertex[0], s=30, c='r')
 
         plt.tight_layout()
 
@@ -197,7 +205,7 @@ class MapEnvironment(object):
             return
         plt.show()
 
-    def visualize_graph(self, G, start, goal, saveto=""):
+    def visualize_graph(self, G, start=None, goal=None, saveto=""):
         plt.clf()
         plt.imshow(self.map, interpolation='nearest', origin='lower')
         edges = G.edges()
@@ -207,6 +215,7 @@ class MapEnvironment(object):
             config1 = edge[0]
             config2 = edge[1]
             path = self.generate_path(config1, config2)[0]
+            #print("path debug", path)
             plt.plot(path[:,1], path[:,0], 'w')
 
         num_nodes = G.number_of_nodes()

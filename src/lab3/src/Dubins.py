@@ -193,12 +193,14 @@ def dubins_path_planning(start, end, curvature):
   ex = ex - sx
   ey = ey - sy
 
+  # transform the end point to start point's frame
   lex = math.cos(syaw) * ex + math.sin(syaw) * ey
   ley = - math.sin(syaw) * ex + math.cos(syaw) * ey
   leyaw = eyaw - syaw
-
+#  IPython.embed()
   lpx, lpy, lpyaw, mode, clen = dubins_path_planning_from_origin(lex, ley, leyaw, curvature)
 
+  # tranform everything back to global frame
   px = [math.cos(-syaw) * x + math.sin(-syaw) *
         y + sx for x, y in zip(lpx, lpy)]
   py = [- math.sin(-syaw) * x + math.cos(-syaw) *
@@ -308,7 +310,7 @@ def main():
     plt.axis("equal")
     plt.show()
 
-    IPython.embed()
+#    IPython.embed()
 
 if __name__ == '__main__':
   main()
