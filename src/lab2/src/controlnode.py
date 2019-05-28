@@ -323,4 +323,5 @@ class ControlNode:
 
     def cb_init_pose(self, pose):
         # self.initialpose = utils.rospose_to_posetup_(pose)
+        self.path_event.clear()
         self.path_event.set()

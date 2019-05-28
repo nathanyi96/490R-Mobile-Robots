@@ -131,32 +131,30 @@ class MapEnvironment(object):
 
         return np.concatenate(path, axis=0)
 
-    def shortcut(self, G, waypoints, num_trials=100):
+    def shortcut(self, G, waypoints, num_trials=10):
         """
         Short cut waypoints if collision free
         @param waypoints list of node indices in the graph
         """
+        # Implement here
+        # 1. Choose two configurations
+        # 2. Check for collision
+        # 3. Connect them if collision free
         print("Originally {} waypoints".format(len(waypoints)))
-        # for _ in range(num_trials):
-
-        for i in range(len(waypoints)):
-
+        for _ in range(num_trials):
             if len(waypoints) == 2:
                 break
+            #for i in range(len(waypoints)):
+            i = np.random.randint(0, len(waypoints) - 2)
+            #for j in range(len(waypoints), i, -1):
+            j = np.random.randint(i + 1, len(waypoints))
+            start_node = waypoints[i]
+            end_node = waypoints[j]
 
-            # Implement here
-            # 1. Choose two configurations
-            # 2. Check for collision
-            # 3. Connect them if collision free
-
-            for j in range(len(waypoints), i, -1):
-                start_node = waypoints[i]
-                end_node = waypoints[j]
-
-                valid, weight = self.edge_validity_checker(start_node, end_node)
-                if valid:
-                    G.add_weighted_edges([(start_node, end_node, weight)]) # Add new edge to graph for future reference
-                    del waypoints[i+1:j] # Delete waypoints in between
+            valid, weight = self.edge_validity_checker(start_node, end_node)
+            if valid:
+                G.add_weighted_edges_from([(start_node, end_node, weight)]) # Add new edge to graph for future reference
+                del waypoints[i+1:j] # Delete waypoints in between
 
         print("Path shortcut to {} waypoints".format(len(waypoints)))
         return waypoints

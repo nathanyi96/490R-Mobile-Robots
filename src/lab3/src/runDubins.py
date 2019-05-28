@@ -67,7 +67,7 @@ if __name__ == "__main__":
             path = astar.astar_path(G,
                 source=start_id, target=goal_id, heuristic=heuristic)
 
-        planning_env.visualize_plan(G, path, start_id, goal_id)
+        planning_env.visualize_plan(G, path, start_id, goal_id, saveto='dubin')
     except nx.NetworkXNoPath as e:
         print(e)
 

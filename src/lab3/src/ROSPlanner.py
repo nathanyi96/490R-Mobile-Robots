@@ -24,11 +24,12 @@ import graph_maker
 import pickle
 import util
 import lazy_astar
+from Sampler import Sampler
 
 
 class ROSPlanner:
     def __init__(self, heuristic_func, weight_func, num_vertices, connection_radius,
-        graph_file='ros_graph.pkl', do_shortcut=False, num_goals=1,
+        graph_file='ros_graph.pkl-250', do_shortcut=False, num_goals=1,
         curvature=0.04):
         """
         @param heuristic_func: Heuristic function to be used in lazy_astar
@@ -52,7 +53,7 @@ class ROSPlanner:
         self.map_c = np.cos(self.map_angle)
         self.map_s = np.sin(self.map_angle)
         self.map_data = self.load_permissible_region(self.map)
-
+        self.goals = None
         rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.get_goal)
         rospy.Subscriber('/sim_car_pose/pose', PoseStamped, self.get_current_pose)
 
@@ -120,11 +121,13 @@ class ROSPlanner:
 
         self.path_nodes = path_nodes
         self.new_goal = True
-
+        if self.do_shortcut:
+            path_nodes = self.planning_env.shortcut(self.G, path_nodes)
         start = path_nodes[0]
         path = None
         for i in range(np.shape(path_nodes)[0]-1):
             seg = self.planning_env.generate_path(path_nodes[i], path_nodes[i+1])[0]
+
             if np.any(path == None):
                 path = seg
             else:
@@ -143,15 +146,12 @@ class ROSPlanner:
         Plan a route from start to self.goals
         Return a path connecting them.
         """
-        ## need test
         path = [] # contains nodes
-        if self.goals.shape[0] > 1:
-            print("start plan multiple goals")
-            for goal in self.goals:
-                path += lazy_astar.astar_path(self.G, source=start, target=goal,
-                        weight=self.weight_func, heuristic=self.heuristic_func)
-                start = goal
-        return path
+        print("start plan multiple goals")
+        for goal in self.goals:
+            path.append(self.plan_to_goal(start, goal)) 
+            start = goal
+        return np.concatenate(path, axis=0)
 
     def get_goal(self, msg):
         """
@@ -188,12 +188,19 @@ class ROSPlanner:
 
     def get_current_pose(self, msg):
         self.current_pose = msg.pose
+        if self.goals and len(self.goals) == self.num_goals: 
+            self.goals = [] # clear
+        self.goal = None 
+
+    def densify_graph(self, cost):
+        pass
+
 
     def send_path(self, waypoints):
-        print("prepare to send waypoints", waypoints)
+        print("prepare to send waypoints", len(waypoints))
         h = Header()
         h.stamp = rospy.Time.now()
-        desired_speed = 0.5
+        desired_speed = 2.0
 
         speeds = np.zeros(len(waypoints))
         speeds[:] = desired_speed
@@ -304,5 +311,4 @@ if __name__ == '__main__':
 
     heuristic = lambda n1, n2, env, G: env.compute_heuristic(n1, n2)
     weight = lambda n1, n2, env, G: env.edge_validity_checker(n1, n2)
-
-    ROSPlanner(heuristic, weight, num_vertices=250, connection_radius=500)
+    ROSPlanner(heuristic, weight, num_vertices=1000, connection_radius=50, do_shortcut=True, num_goals=3) # 250 500
