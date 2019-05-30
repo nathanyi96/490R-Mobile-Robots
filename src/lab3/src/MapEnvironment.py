@@ -1,5 +1,6 @@
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib.patches import Ellipse
 import IPython
 class MapEnvironment(object):
 
@@ -16,7 +17,7 @@ class MapEnvironment(object):
         self.limit = np.array([self.xlimit, self.ylimit])
         self.maxdist = np.float('inf')
         self.stepsize = stepsize
-        print()
+
         # Display the map.
         plt.imshow(self.map, interpolation='nearest', origin='lower')
         plt.savefig('map.png')
@@ -36,10 +37,6 @@ class MapEnvironment(object):
 
         ## Implement here
         ## 1. Check for state bounds within xlimit and ylimit
-        #x_within_limits = np.where((x_coordinates > self.xlimit[0]) & (x_coordinates < self.xlimit[1]), True, False)
-        #y_within_limits = np.where((y_coordinates > self.ylimit[0]) & (y_coordinates < self.ylimit[1]), True, False)
-        #xy_limits_bool = np.column_stack((x_within_limits, y_within_limits), axis=1)
-        #all_xy_within_limits = np.all(within_limits, axis=1) # Should have shape (num_configs,)
 
         ## 2. Check collision
         #locations_collisions = self.map[x_coordinates, y_coordinates]
@@ -51,8 +48,8 @@ class MapEnvironment(object):
 
         # here is the reason
         # simple convert to int(linear space yields double coordinate). need a better checker
-        x = np.array(x, dtype=int)
-        y = np.array(y, dtype=int)
+        x = np.array(np.round(x), dtype=int)
+        y = np.array(np.round(y), dtype=int)
 
         #print(configs)
         x_1 = (x < self.xlimit[1] ) * (x >= self.xlimit[0])
@@ -61,7 +58,7 @@ class MapEnvironment(object):
         # 2. Check collision
         x = np.clip(x, self.xlimit[0], self.xlimit[1] - 1)
         y = np.clip(y, self.ylimit[0], self.ylimit[1] - 1)
-        check2 = self.map[x,y] == 0 ## cuz map is an array. if use random.uniform, it's double
+        check2 = (self.map[x,y] == 0)
         validity = check1 * check2
         return validity
 
@@ -84,12 +81,12 @@ class MapEnvironment(object):
     def compute_heuristic(self, config, goal):
         """
         Returns a heuristic distance between config and goal
+        @param config: tuple or ndarray of start config
+        @param goal: list of tuples, or 2D ndarray, of end confings
         @return a float value
         """
         # Implement here
-
-        heuristic =  np.linalg.norm(np.array(goal)[0:2] - np.array(config)[0:2]) # Essentially same as self.compute_distances??
-        # np.linalg.norm(np.array(goal) - np.array(config), axis=1)
+        heuristic =  np.linalg.norm(np.array(goal) - np.array(config))
         return heuristic
 
     def compute_distances(self, start_config, end_configs):
@@ -99,9 +96,7 @@ class MapEnvironment(object):
         @param end_configs: list of tuples of end confings
         @return 1D  numpy array of distances
         """
-
-        distances = np.linalg.norm(np.array(end_configs)[:,0:2] - np.array(start_config)[0:2], axis=1)
-
+        distances = np.linalg.norm(np.array(end_configs) - np.array(start_config), axis=1)
         return distances
 
     def generate_path(self, config1, config2):
@@ -109,7 +104,7 @@ class MapEnvironment(object):
         config2 = np.array(config2)[0:2]
         dist = np.linalg.norm(config2 - config1)
         if dist == 0:
-            return config1, dist
+            return config1.reshape(-1, 2), dist
         direction = (config2 - config1) / dist
         steps = dist // self.stepsize + 1
 
@@ -189,6 +184,7 @@ class MapEnvironment(object):
         for vertex in G.nodes:
             #config = G.nodes[vertex]["config"]
             if vertex == start:
+                # Color the start node with blue
                 plt.scatter(vertex[1], vertex[0], s=30, c='b')
             elif vertex == goal:
                 # Color the goal node with green
@@ -203,21 +199,22 @@ class MapEnvironment(object):
             return
         plt.show()
 
-    def visualize_graph(self, G, start=None, goal=None, saveto=""):
-        plt.clf()
+    def visualize_graph(self, G, start=None, goal=None, added_node=None, ellipse=None, saveto=""):
+        ax = plt.gca()
         plt.imshow(self.map, interpolation='nearest', origin='lower')
-        edges = G.edges()
-        for edge in edges:
-            #config1 = G.nodes[edge[0]]["config"]
-            #config2 = G.nodes[edge[1]]["config"]
-            config1 = edge[0]
-            config2 = edge[1]
-            path = self.generate_path(config1, config2)[0]
-            #print("path debug", path)
-            plt.plot(path[:,1], path[:,0], 'w')
+        # edges = G.edges()
+        # for edge in edges:
+        #     #config1 = G.nodes[edge[0]]["config"]
+        #     #config2 = G.nodes[edge[1]]["config"]
+        #     config1 = edge[0]
+        #     config2 = edge[1]
+        #     path = self.generate_path(config1, config2)[0]
+        #     plt.plot(path[:,1], path[:,0], 'w')
 
         num_nodes = G.number_of_nodes()
-
+        #ax = plt.gca()
+        print 'start', start
+        print 'goal', goal
         for i, vertex in enumerate(G.nodes()):
             config = vertex
 
@@ -229,9 +226,14 @@ class MapEnvironment(object):
             elif vertex == goal:
                 # Color the goal node with green
                 plt.scatter(config[1], config[0], s=30, c='g')
+            elif (added_node is not None) and (vertex in added_node):
+                # Color the goal node with green
+                plt.scatter(config[1], config[0], s=30, c='y')
             else:
                 plt.scatter(config[1], config[0], s=30, c='r')
-
+        if ellipse is not None:
+            ell = Ellipse(*ellipse, color='b', edgecolor='b', linewidth=3, alpha=0.5)
+            ax.add_patch(ell)
         plt.tight_layout()
 
         if saveto != "":

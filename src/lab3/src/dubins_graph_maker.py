@@ -39,8 +39,8 @@ def make_graph(env, sampler, connection_radius, num_vertices, lazy=False, saveto
     @returns a undirected weighted graph G where each node is a tuple (x, y)
              and edge data the distance between nodes.
     """
-
-    G = nx.Graph()
+    print 'dubins graph maker'
+    G = nx.DiGraph()
     # Implement here
 
     # TODO: Code needs to be restructured, maybe vectorized?
@@ -52,29 +52,20 @@ def make_graph(env, sampler, connection_radius, num_vertices, lazy=False, saveto
     for vid in tqdm(range(len(vertices))):
         vertex = tuple(vertices[vid])
         G.add_node(vertex)
-        distances = env.compute_distances(vertices[vid], vertices[vid+1:])
-        for vid2 in range(vid+1, len(vertices)):
-            dist = distances[vid2-vid-1]
-            if (dist < connection_radius) and (lazy or env.edge_validity_checker(vertices[vid], vertices[vid2])[0]):
-                edges.append((vertex, tuple(vertices[vid2]), dist))
-                # if lazy:
-                #     # G.add_weighted_edges_from([(i, j, edge_weight)])
-                #     # path, edge_weight = env.generate_path(vertex_tuple, neighbor_vertex_tuple) ## why don't just use distance_between_nodes ?
-                #     # edges_list.append((vertex_tuple, neighbor_vertex_tuple, edge_weight))
-                #     edges_list.append((vertex_tuple, neighbor_vertex_tuple, distance_between_nodes))
-                # else:
-                #     edge_is_valid, edge_weight = env.edge_validity_checker(vertex_tuple, neighbor_vertex_tuple)
-                #     if edge_is_valid:
-                #         #print("add edge", vertex_tuple, neighbor_vertex_tuple)
-                #         edges_list.append((vertex_tuple, neighbor_vertex_tuple, edge_weight))
+        distances = env.compute_distances(vertices[vid], vertices)
+        for vid2 in range(len(vertices)):
+            if vid != vid2:
+                dist = distances[vid2]
+                if (dist < connection_radius) and (lazy or env.edge_validity_checker(vertices[vid], vertices[vid2])[0]):
+                    edges.append((vertex, tuple(vertices[vid2]), dist))
         if vid % 100 == 0:
             print 'cost time', time.time() - start_time
-    G.add_weighted_edges_from(edges) # Nodes should automatically connect bidirectionally
+    G.add_weighted_edges_from(edges)
 
     # Check for connectivity.
-    num_connected_components = len(list(nx.connected_components(G)))
-    if not num_connected_components == 1:
-        print ("warning, Graph has {} components, not connected".format(num_connected_components))
+    #num_connected_components = len(list(nx.connected_components(G)))
+    #if not num_connected_components == 1:
+    #    print ("warning, Graph has {} components, not connected".format(num_connected_components))
 
     # Save the graph to reuse.
     if saveto is not None:
@@ -180,14 +171,19 @@ def add_node(G, config, env, connection_radius):
     # Add edges from the newly added node
     edge_list = []
     for node in G.nodes():
+        euc_dist = np.linalg.norm(np.array(node)[:2] - np.array(config)[:2])
+        if euc_dist > connection_radius: continue
         edge_is_valid, dist = env.edge_validity_checker(config, node)
         if edge_is_valid and (1e-8 < dist < connection_radius):
             edge_list.append((config, node, dist))
+        edge_is_valid, dist = env.edge_validity_checker(node, config)
+        if edge_is_valid and (1e-8 < dist < connection_radius):
+            edge_list.append((node, config, dist))
     G.add_weighted_edges_from(edge_list)
     # Check for connectivity.
-    num_connected_components = len(list(nx.connected_components(G)))
-    if not num_connected_components == 1:
-        print ("warning, Graph has {} components, not connected".format(num_connected_components))
+    #num_connected_components = len(list(nx.connected_components(G)))
+    #if not num_connected_components == 1:
+    #    print ("warning, Graph has {} components, not connected".format(num_connected_components))
 
     return G, config
     #return G, index

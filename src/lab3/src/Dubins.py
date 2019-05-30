@@ -187,8 +187,6 @@ def dubins_path_planning(start, end, curvature):
       mode
 
   """
-  import time
-  end_time = time.time()
   sx, sy, syaw = start[0], start[1], start[2]
   ex, ey, eyaw = end[0], end[1], end[2]
 
@@ -215,7 +213,6 @@ def dubins_path_planning(start, end, curvature):
   diff = np.diff(path, axis=0)
   length = np.linalg.norm(diff, axis=1)
   path_length = np.sum(length)
-  # print 'check dubin path planning time', time.time() - end_time
   return ppx, ppy, ppyaw, path_length
 
 def path_length(s, e, c):

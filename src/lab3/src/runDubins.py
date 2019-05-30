@@ -4,7 +4,7 @@ import argparse, numpy, time
 import networkx as nx
 import math
 import numpy as np
-import graph_maker
+import dubins_graph_maker as graph_maker
 import astar
 import lazy_astar
 from DubinsSampler import DubinsSampler
@@ -42,7 +42,8 @@ if __name__ == "__main__":
     G = graph_maker.make_graph(planning_env,
         sampler=DubinsSampler(planning_env),
         num_vertices=args.num_vertices,
-        connection_radius=args.connection_radius)
+        connection_radius=args.connection_radius,
+        lazy=args.lazy)
 
     G, start_id = graph_maker.add_node(G, args.start, env=planning_env,
         connection_radius=args.connection_radius)
@@ -50,13 +51,13 @@ if __name__ == "__main__":
         connection_radius=args.connection_radius)
 
     # Uncomment this to visualize the graph
-    planning_env.visualize_graph(G,start_id, goal_id)
+    #planning_env.visualize_graph(G,start_id, goal_id)
 
     try:
         heuristic = lambda n1, n2: planning_env.compute_heuristic(
             #G.nodes[n1]['config'], G.nodes[n2]['config'])
             n1, n2)
-
+        start_time = time.time()
         if args.lazy:
             weight = lambda n1, n2: planning_env.edge_validity_checker(
                 #G.nodes[n1]['config'], G.nodes[n2]['config'])
@@ -66,7 +67,7 @@ if __name__ == "__main__":
         else:
             path = astar.astar_path(G,
                 source=start_id, target=goal_id, heuristic=heuristic)
-
+        print('plan time: ', time.time() - start_time)
         planning_env.visualize_plan(G, path, start_id, goal_id, saveto='dubin')
     except nx.NetworkXNoPath as e:
         print(e)

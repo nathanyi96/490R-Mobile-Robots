@@ -48,26 +48,26 @@ if __name__ == "__main__":
         connection_radius=args.connection_radius)
 
     # Uncomment this to visualize the graph
-    planning_env.visualize_graph(G, tuple(args.start), tuple(args.goal))
-    end = time.time()
-    try:
-        heuristic = lambda n1, n2: planning_env.compute_heuristic(
-        #    G.nodes[n1]['config'], G.nodes[n2]['config'])
-            n1, n2)
+    #planning_env.visualize_graph(G, tuple(args.start), tuple(args.goal))
 
+    try:
+        heuristic = planning_env.compute_heuristic
+        #heuristic = lambda n1, n2: planning_env.compute_heuristic(
+        #    G.nodes[n1]['config'], G.nodes[n2]['config'])
+        #    n1, n2)
+        end = time.time()
         if args.lazy:
             print("lazy A*")
-            weight = lambda n1, n2: planning_env.edge_validity_checker(
+            weight = planning_env.edge_validity_checker
+            #weight = lambda n1, n2: planning_env.edge_validity_checker(n1, n2)
             #    G.nodes[n1]['config'], G.nodes[n2]['config'])
-                n1, n2)
             path = lazy_astar.astar_path(G,
                 source=start_id, target=goal_id, weight=weight, heuristic=heuristic)
         else:
             path = astar.astar_path(G,
                 source=start_id, target=goal_id, heuristic=heuristic)
-        print("path we got", path)
-
+        print('plan time: ', time.time() - end)
+        #print("path we got", path)
         planning_env.visualize_plan(G, path, start_id, goal_id)
     except nx.NetworkXNoPath as e:
         print(e)
-    print('plan time: ', time.time() - end)

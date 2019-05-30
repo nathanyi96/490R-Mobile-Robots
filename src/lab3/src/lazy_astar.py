@@ -6,7 +6,7 @@ import numpy as np
 import networkx as nx
 import graph_maker
 import IPython
-def astar_path(G, source, target, weight, heuristic=None):
+def astar_path(G, source, target, weight, heuristic=None, return_dist=False):
     """Return a list of nodes in a shortest path between source and target
     using the A* ("A-star") algorithm.
 
@@ -75,8 +75,13 @@ def astar_path(G, source, target, weight, heuristic=None):
     while queue:
         # Pop the smallest item from queue.
         _, __, curnode, dist, parent = pop(queue)
-
         # Implement here using astar.py as your reference.
+        if curnode in explored:
+            continue
+        if parent:  # not start node
+            validity, _ = weight(parent, curnode)
+            if not validity:
+                continue
         if curnode == target:
             path = [curnode]
             node = parent
@@ -84,18 +89,13 @@ def astar_path(G, source, target, weight, heuristic=None):
                 path.append(node)
                 node = explored[node]
             path.reverse()
-            return path
-
-        if curnode in explored:
-            continue
-
+            if not return_dist:
+                return path
+            return path, dist
         explored[curnode] = parent
 
         for neighbor, w in G[curnode].items():
             if neighbor in explored:
-                continue
-            validity, _ = weight(neighbor, curnode)
-            if not validity:
                 continue
             ncost = dist + w.get('weight', 1)
             if neighbor in enqueued:

@@ -19,10 +19,10 @@ class DubinsMapEnvironment(MapEnvironment):
         """
         start_config, end_configs = np.array(start_config), np.array(end_configs)
         num = end_configs.shape[0]
-        distances = np.zeros((num, 1))
+        distances = np.zeros(num)
         # Implement here
         for i in range(num):
-            _,_,_, distance = dubins_path_planning(start_config, end_configs[i], self.curvature)
+            _1,_2,_3, distance = dubins_path_planning(start_config, end_configs[i], self.curvature)
             distances[i] = distance
         return distances
 
@@ -34,7 +34,7 @@ class DubinsMapEnvironment(MapEnvironment):
         # Implement here
 
         config, goal = np.array(config), np.array(goal)
-        _,_,_, heuristic = dubins_path_planning(config, goal, self.curvature)
+        _1, _2, _3, heuristic = dubins_path_planning(config, goal, self.curvature)
         return heuristic
 
     def generate_path(self, config1, config2):
