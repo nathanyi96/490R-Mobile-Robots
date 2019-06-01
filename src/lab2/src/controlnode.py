@@ -15,6 +15,7 @@ from visualization_msgs.msg import Marker
 
 import csv
 import mpc
+import mpc2
 import nonlinear
 import pid
 import purepursuit
@@ -25,6 +26,7 @@ controllers = {
     "PP": purepursuit.PurePursuitController,
     "NL": nonlinear.NonLinearController,
     "MPC": mpc.ModelPredictiveController,
+    "MPC2": mpc2.ModelPredictiveControllerNaive,
 }
 
 class AverageMeter(object):

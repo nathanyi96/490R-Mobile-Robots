@@ -187,6 +187,10 @@ def dubins_path_planning(start, end, curvature):
       mode
 
   """
+<<<<<<< HEAD
+  # print("start and end:", start, end)
+=======
+>>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
   sx, sy, syaw = start[0], start[1], start[2]
   ex, ey, eyaw = end[0], end[1], end[2]
 

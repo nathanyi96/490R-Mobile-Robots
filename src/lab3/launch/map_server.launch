@@ -2,5 +2,9 @@
 <launch>
     <node pkg="map_server" name="map_server" type="map_server" args="$(find lab3)/maps/cse022_w_obstacles.yaml" ns="/obs"/>
 
+<<<<<<< HEAD
+    <node pkg="map_server" name="map_server" type="map_server" args="$(find lab3)/maps/cse022.yaml"/>
+=======
     <!-- <node pkg="map_server" name="map_server" type="map_server" args="$(find lab3)/maps/cse022.yaml"/> -->
+>>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
 </launch>

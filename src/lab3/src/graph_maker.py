@@ -49,14 +49,30 @@ def make_graph(env, sampler, connection_radius, num_vertices, lazy=False, saveto
     edges = []
     # 2. Connect them with edges
     start_time = time.time()
+<<<<<<< HEAD
+    cnt = 0
+=======
+>>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
     for vid in tqdm(range(len(vertices))):
         vertex = tuple(vertices[vid])
         G.add_node(vertex)
         distances = env.compute_distances(vertices[vid], vertices[vid+1:])
         for vid2 in range(vid+1, len(vertices)):
             dist = distances[vid2-vid-1]
+<<<<<<< HEAD
+            # if (dist < connection_radius) and (lazy or env.edge_validity_checker(vertices[vid], vertices[vid2])[0]):
+            #     edges.append((vertex, tuple(vertices[vid2]), dist))
+            if (dist < connection_radius):
+                if lazy: 
+                    edges.append((vertex, tuple(vertices[vid2]), dist))
+                else:
+                    cnt += 1
+                    if env.edge_validity_checker(vertices[vid], vertices[vid2])[0]:
+                        edges.append((vertex, tuple(vertices[vid2]), dist))
+=======
             if (dist < connection_radius) and (lazy or env.edge_validity_checker(vertices[vid], vertices[vid2])[0]):
                 edges.append((vertex, tuple(vertices[vid2]), dist))
+>>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
                 # if lazy:
                 #     # G.add_weighted_edges_from([(i, j, edge_weight)])
                 #     # path, edge_weight = env.generate_path(vertex_tuple, neighbor_vertex_tuple) ## why don't just use distance_between_nodes ?
@@ -70,7 +86,11 @@ def make_graph(env, sampler, connection_radius, num_vertices, lazy=False, saveto
         if vid % 100 == 0:
             print 'cost time', time.time() - start_time
     G.add_weighted_edges_from(edges) # Nodes should automatically connect bidirectionally
+<<<<<<< HEAD
+    print("# edges evaluated", cnt)
+=======
 
+>>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
     # Check for connectivity.
     num_connected_components = len(list(nx.connected_components(G)))
     if not num_connected_components == 1:
@@ -191,3 +211,9 @@ def add_node(G, config, env, connection_radius):
 
     return G, config
     #return G, index
+<<<<<<< HEAD
+
+
+
+=======
+>>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d

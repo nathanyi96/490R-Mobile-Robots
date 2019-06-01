@@ -19,7 +19,11 @@ x, y = np.array([-1, -1]), np.array([1, 1])
 ax.scatter([x[0], y[0]], [x[1], y[1]], color='r')
 
 for i in range(1000):
+<<<<<<< HEAD
+    a, b, h = isam.informed_sample(3, 2*np.sqrt(2), x, y, 1)
+=======
     a, b, h = isam.informed_sample(3, 2*np.sqrt(2), x, y)
+>>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
     ax.scatter(a, b, color='g')
 
 plt.show()

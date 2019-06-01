@@ -30,7 +30,11 @@ class DubinsSampler:
             samples[i*n_xy:(i+1)*n_xy,2] = (i * step) + np.random.normal(0, 0.03, size=n_xy)
         print 'sample time:', time.time()-start_time
 
+<<<<<<< HEAD
+        print 'sampling range--', self.xlimit, self.ylimit
+=======
         #print 'sampling range--', self.xlimit, self.ylimit
+>>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
 
         #x_samples = np.random.uniform(self.xlimit[0], self.xlimit[1], num_samples)
         #y_samples = np.random.uniform(self.ylimit[0], self.ylimit[1], num_samples)

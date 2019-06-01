@@ -24,7 +24,11 @@ if __name__ == "__main__":
                         help='The environment to plan on')
     parser.add_argument('-s', '--start', nargs='+', type=int, required=True)
     parser.add_argument('-g', '--goal', nargs='+', type=int, required=True)
+<<<<<<< HEAD
+    parser.add_argument('-c', '--curvature', type=float, default=3)
+=======
     parser.add_argument('-c', '--curvature', type=float, default=2)
+>>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
     parser.add_argument('--num-vertices', type=int, required=True)
     parser.add_argument('--connection-radius', type=float, default=15.0)
     parser.add_argument('--lazy', action='store_true')
@@ -62,6 +66,20 @@ if __name__ == "__main__":
             weight = lambda n1, n2: planning_env.edge_validity_checker(
                 #G.nodes[n1]['config'], G.nodes[n2]['config'])
                 n1, n2)
+<<<<<<< HEAD
+            path, dist = lazy_astar.astar_path(G,
+                source=start_id, target=goal_id, weight=weight, heuristic=heuristic)
+        else:
+            path, dist = astar.astar_path(G,
+                source=start_id, target=goal_id, heuristic=heuristic)
+        print('plan time: ', time.time() - start_time)
+        print('path length: {}'.format(dist))
+        planning_env.visualize_plan(G, path, start_id, goal_id)
+    except nx.NetworkXNoPath as e:
+        print(e)
+
+    # import IPython, IPython.embed()
+=======
             path = lazy_astar.astar_path(G,
                 source=start_id, target=goal_id, weight=weight, heuristic=heuristic)
         else:
@@ -74,3 +92,4 @@ if __name__ == "__main__":
 
 
 #    import IPython; IPython.embed()
+>>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d

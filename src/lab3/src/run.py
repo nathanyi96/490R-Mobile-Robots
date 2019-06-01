@@ -25,6 +25,10 @@ if __name__ == "__main__":
     parser.add_argument('-g', '--goal', nargs='+', type=int, required=True)
     parser.add_argument('--num-vertices', type=int, required=True)
     parser.add_argument('--connection-radius', type=float, default=20.0)
+<<<<<<< HEAD
+    parser.add_argument('--shortcut', action='store_true')
+=======
+>>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
     parser.add_argument('--lazy', action='store_true')
 
     args = parser.parse_args()
@@ -33,6 +37,11 @@ if __name__ == "__main__":
     map_data = np.loadtxt(args.map).astype(np.int)
     planning_env = MapEnvironment(map_data)
 
+<<<<<<< HEAD
+    end = time.time()
+
+=======
+>>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
     # Make a graph
     G = graph_maker.make_graph(planning_env,
         sampler=Sampler(planning_env),
@@ -47,8 +56,14 @@ if __name__ == "__main__":
     G, goal_id = graph_maker.add_node(G, args.goal, env=planning_env,
         connection_radius=args.connection_radius)
 
+<<<<<<< HEAD
+    print('graph making time: ', time.time() - end)
+    # Uncomment this to visualize the graph
+    # planning_env.visualize_graph(G, tuple(args.start), tuple(args.goal))
+=======
     # Uncomment this to visualize the graph
     #planning_env.visualize_graph(G, tuple(args.start), tuple(args.goal))
+>>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
 
     try:
         heuristic = planning_env.compute_heuristic
@@ -61,6 +76,23 @@ if __name__ == "__main__":
             weight = planning_env.edge_validity_checker
             #weight = lambda n1, n2: planning_env.edge_validity_checker(n1, n2)
             #    G.nodes[n1]['config'], G.nodes[n2]['config'])
+<<<<<<< HEAD
+            path, dist = lazy_astar.astar_path(G,
+                source=start_id, target=goal_id, weight=weight, heuristic=heuristic)
+        else:
+            path, dist = astar.astar_path(G,
+                source=start_id, target=goal_id, heuristic=heuristic)
+        print('plan time: ', time.time() - end)
+        # print('path length: {}'.format(dist))
+        #print("path we got", path)
+        if args.shortcut:
+            end = time.time()
+            plan = planning_env.shortcut(G, path)
+            print('short cut time: ', time.time() - end)
+            print(path)
+            dist = planning_env.compute_path_length(path)
+            print('path length: {}'.format(dist))
+=======
             path = lazy_astar.astar_path(G,
                 source=start_id, target=goal_id, weight=weight, heuristic=heuristic)
         else:
@@ -68,6 +100,7 @@ if __name__ == "__main__":
                 source=start_id, target=goal_id, heuristic=heuristic)
         print('plan time: ', time.time() - end)
         #print("path we got", path)
+>>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
         planning_env.visualize_plan(G, path, start_id, goal_id)
     except nx.NetworkXNoPath as e:
         print(e)

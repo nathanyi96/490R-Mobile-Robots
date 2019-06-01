@@ -96,9 +96,23 @@ class MapEnvironment(object):
         @param end_configs: list of tuples of end confings
         @return 1D  numpy array of distances
         """
+<<<<<<< HEAD
+        end_configs = np.array(end_configs)
+        start_config = np.array(start_config)
+        distances = np.linalg.norm( end_configs - start_config, axis=1)
+        return distances
+
+    def compute_path_length(self, path):
+        dist = 0
+        for i in range(len(path)-1):
+            dist += self.compute_distances(path[i], np.array(path[i+1]).reshape(-1, 2))
+        return dist
+
+=======
         distances = np.linalg.norm(np.array(end_configs) - np.array(start_config), axis=1)
         return distances
 
+>>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
     def generate_path(self, config1, config2):
         config1 = np.array(config1)[0:2]
         config2 = np.array(config2)[0:2]
@@ -113,6 +127,10 @@ class MapEnvironment(object):
         return waypoints, dist
 
     def get_path_on_graph(self, G, path_nodes):
+<<<<<<< HEAD
+        # print(path_nodes)
+=======
+>>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
         plan = []
         for node in path_nodes:
             #plan += [G.nodes[node]["config"]]
@@ -121,7 +139,13 @@ class MapEnvironment(object):
 
         path = []
         xs, ys, yaws = [], [], []
+<<<<<<< HEAD
+        print(plan)
         for i in range(np.shape(plan)[0] - 1):
+            # print(plan[i])
+=======
+        for i in range(np.shape(plan)[0] - 1):
+>>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
             path += [self.generate_path(plan[i], plan[i+1])[0]]
 
         return np.concatenate(path, axis=0)
@@ -165,20 +189,33 @@ class MapEnvironment(object):
             #plan += [G.nodes[node]["config"]]
             plan += [node]
         plan = np.array(plan)
+<<<<<<< HEAD
+        # print(plan)
+=======
 
+>>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
         plt.clf()
         plt.imshow(self.map, interpolation='none', cmap='gray', origin='lower')
 
         # Comment this to hide all edges. This can take long.
         # edges = G.edges()
         # for edge in edges:
+<<<<<<< HEAD
+        #     # config1 = G.nodes[edge[0]]["config"]
+        #     # config2 = G.nodes[edge[1]]["config"]
+=======
         #     config1 = G.nodes[edge[0]]["config"]
         #     config2 = G.nodes[edge[1]]["config"]
+>>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
         #     x = [config1[0], config2[0]]
         #     y = [config1[1], config2[1]]
         #     plt.plot(y, x, 'grey')
 
         path = self.get_path_on_graph(G, path_nodes)
+<<<<<<< HEAD
+        # print(path)
+=======
+>>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
         plt.plot(path[:,1], path[:,0], 'y', linewidth=1)
 
         for vertex in G.nodes:
@@ -202,6 +239,17 @@ class MapEnvironment(object):
     def visualize_graph(self, G, start=None, goal=None, added_node=None, ellipse=None, saveto=""):
         ax = plt.gca()
         plt.imshow(self.map, interpolation='nearest', origin='lower')
+<<<<<<< HEAD
+        edges = G.edges()
+        for edge in edges:
+            #config1 = G.nodes[edge[0]]["config"]
+            #config2 = G.nodes[edge[1]]["config"]
+            config1 = edge[0]
+            config2 = edge[1]
+            # print("config:", config1, config2)
+            path = self.generate_path(config1, config2)[0]
+            plt.plot(path[:,1], path[:,0], 'w')
+=======
         # edges = G.edges()
         # for edge in edges:
         #     #config1 = G.nodes[edge[0]]["config"]
@@ -210,6 +258,7 @@ class MapEnvironment(object):
         #     config2 = edge[1]
         #     path = self.generate_path(config1, config2)[0]
         #     plt.plot(path[:,1], path[:,0], 'w')
+>>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
 
         num_nodes = G.number_of_nodes()
         #ax = plt.gca()

@@ -88,7 +88,11 @@ def astar_path(G, source, target, heuristic=None):
                 path.append(node)
                 node = explored[node]
             path.reverse()
+<<<<<<< HEAD
+            return path, dist
+=======
             return path
+>>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
 
         if curnode in explored:
             continue

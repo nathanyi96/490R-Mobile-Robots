@@ -1,15 +1,16 @@
 import numpy as np
 import rospy
 import utils
+import rosviz
 
 from controller import BaseController
 
 from nav_msgs.srv import GetMap
 
 
-class ModelPredictiveController(BaseController):
+class ModelPredictiveControllerNaive(BaseController):
     def __init__(self):
-        super(ModelPredictiveController, self).__init__()
+        super(ModelPredictiveControllerNaive, self).__init__()
 
         self.reset_params()
         self.reset_state()
@@ -33,7 +34,12 @@ class ModelPredictiveController(BaseController):
             #
             # Note: this method must be computationally efficient
             # as it is running directly in the tight control loop.
-            assert False, "Complete this function"
+            dist = np.sum((self.path[:,0:2] - pose[0:2])**2, axis=1)
+            dist = np.sqrt(dist)
+            argm = np.argmin(dist)
+            closest = np.abs(dist[argm:] - self.waypoint_lookahead)
+            idx = np.argmin(closest) + argm
+            return idx
 
     def get_control(self, pose, index):
         '''
@@ -62,8 +68,25 @@ class ModelPredictiveController(BaseController):
 
         # Then step forward the K control trajectory T timesteps using
         # self.apply_kinematics
+        assert len(pose) == 3
+        pose_ref = self.get_reference_pose(index)
 
-        assert False, "Complete this function"
+        rollouts = np.zeros((self.K, self.T+1, 3))
+
+        # For each K trial, the first position is at the current position (pose)
+        # Set initial
+        rollouts[:,0,0] = pose[0] # x
+        rollouts[:,0,1] = pose[1] # y
+        rollouts[:,0,2] = pose[2] # theta
+
+        # For control trajectories, get the speed from reference point.
+        self.trajs[:,:,0] = pose_ref[3] # Update velocities
+
+        # Then step forward the K control trajectory T timesteps using
+        # self.apply_kinematics
+        for i in xrange(self.T):
+            rollouts[:,i+1,:] = np.array(self.apply_kinematics(rollouts[:,i,:], self.trajs[:,i,:])).T # ...(positions, controls)
+
         # Apply the cost function to the rolled out poses.
         costs = self.apply_cost(rollouts, index)
 
@@ -71,6 +94,7 @@ class ModelPredictiveController(BaseController):
         min_control = np.argmin(costs)
 
         # Return the controls which yielded the min cost.
+        rosviz.viz_paths_cmap(rollouts, costs, cmap='seismic', scale=0.004)
         return self.trajs[min_control][0]
 
     def reset_state(self):
@@ -109,12 +133,15 @@ class ModelPredictiveController(BaseController):
             self.finish_threshold = float(rospy.get_param("mpc/finish_threshold", 1.0))
             self.exceed_threshold = float(rospy.get_param("mpc/exceed_threshold", 4.0))
             # Average distance from the current reference pose to lookahed.
-            self.waypoint_lookahead = float(rospy.get_param("mpc/waypoint_lookahead", 1.0))
+            self.waypoint_lookahead = float(rospy.get_param("mpc/waypoint_lookahead", 0.8))
             self.collision_w = float(rospy.get_param("mpc/collision_w", 1e5))
             self.error_w = float(rospy.get_param("mpc/error_w", 1.0))
 
             self.car_length = float(rospy.get_param("mpc/car_length", 0.33))
             self.car_width = float(rospy.get_param("mpc/car_width", 0.15))
+
+            # custom parameters
+            self.dt = float(rospy.get_param("mpc/dt", 0.1))
 
     def get_control_trajectories(self):
         '''
@@ -134,8 +161,11 @@ class ModelPredictiveController(BaseController):
         # Create a trajectory library of K trajectories for T timesteps to
         # roll out when computing the best control.
         ctrls = np.zeros((self.K, self.T, 2))
-        step_size = (self.max_delta - self.min_delta) / (self.K - 1)
-        assert False, "Complete this function"
+        # step_size = (self.max_delta - self.min_delta) / (self.K - 1)
+        deltas = np.linspace(self.min_delta, self.max_delta, num=self.K, endpoint=True)
+        for i in xrange(self.K):
+            ctrls[i,:,1] = deltas[i]
+        return ctrls
 
     def apply_kinematics(self, cur_x, control):
         '''
@@ -156,11 +186,20 @@ class ModelPredictiveController(BaseController):
         #
         # ulimately, return a triplet with x_dot, y_dot_, theta_dot
         # where each is a length K numpy vector.
-        dt = 0.1
-        x_dot = None
-        y_dot = None
-        theta_dot = None
-        assert False, "Complete this function"
+        x = cur_x[:,0]
+        y = cur_x[:,1]
+        theta = cur_x[:,2]
+        velocity = control[:,0]
+        delta = control[:,1]
+
+        theta_dot = theta + (velocity / self.B * np.tan(delta)) * self.dt
+        x_dot = x + (self.B / (np.tan(delta)+1e-12) * (np.sin(theta_dot) - np.sin(theta)))
+        y_dot = y + (self.B / (np.tan(delta)+1e-12) * (-np.cos(theta_dot) + np.cos(theta)))
+
+        straight_idx = (np.absolute(delta) < 1e-8)
+        x_dot[straight_idx] = x[straight_idx] + ((np.cos(theta))[straight_idx])*velocity[straight_idx]*self.dt
+        y_dot[straight_idx] = y[straight_idx] + ((np.sin(theta))[straight_idx])*velocity[straight_idx]*self.dt
+
         return (x_dot, y_dot, theta_dot)
 
     def apply_cost(self, poses, index):

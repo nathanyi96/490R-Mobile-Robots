@@ -18,12 +18,22 @@ class Sampler:
         """
 
         # Implement here
+<<<<<<< HEAD
+        if use_random:
+            # x = np.random.uniform(self.xlimit[0], self.xlimit[1], num_samples)
+            # y = np.random.uniform(self.ylimit[0], self.ylimit[1], num_samples)
+            x = np.random.randint(self.xlimit[0], self.xlimit[1], num_samples)
+            y = np.random.randint(self.ylimit[0], self.ylimit[1], num_samples)
+            samples = np.stack((x, y), axis=1)
+            return samples
+=======
         # if use_random:
         #     x = np.random.uniform(self.xlimit[0], self.xlimit[1], num_samples)
         #     y = np.random.uniform(self.ylimit[0], self.ylimit[1], num_samples)
         #     x = np.random.randint(self.xlimit[0], self.xlimit[1], num_samples)
         #     y = np.random.randint(self.ylimit[0], self.ylimit[1], num_samples)
         #     samples = np.stack((x, y), axis=1)
+>>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
         # else:  # using halton sequence
         #     samples = np.array(halton_sequence(num_samples, 2)).T
         #     samples[:,0] *= (self.xlimit[1] - self.xlimit[0])

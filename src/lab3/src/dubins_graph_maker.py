@@ -187,3 +187,30 @@ def add_node(G, config, env, connection_radius):
 
     return G, config
     #return G, index
+<<<<<<< HEAD
+
+def add_nodes_parallel(G, configs, env, connection_radius):
+    """
+    This function should add a node to an existing graph G.
+    @param G graph, constructed using make_graph
+    @param config Configuration to add to the graph
+    @param env Environment on which the graph is constructed
+    @param connection_radius Maximum distance to connect vertices
+    """
+    def chunks(l, n):
+        for i in range(0, len(l), n):
+            yield l[i:i + n]
+    numberOfThreads = 16
+    pl = []
+    for config in configs:
+        p = Process(target=add_node,
+                    args=[G, config, env, connection_radius])
+        pl.append(p)
+    for i in chunks(pl, numberOfThreads):
+        for p in i:
+            p.start()
+        for p in i:
+            p.join()
+    return G, configs
+=======
+>>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
