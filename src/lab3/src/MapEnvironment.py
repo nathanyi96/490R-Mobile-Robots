@@ -1,7 +1,9 @@
 import numpy as np
+import matplotlib
 from matplotlib import pyplot as plt
 from matplotlib.patches import Ellipse
 import IPython
+#matplotlib.use('Agg')
 class MapEnvironment(object):
 
     def __init__(self, map_data, stepsize=0.5):
@@ -11,6 +13,7 @@ class MapEnvironment(object):
         """
         # Obtain the boundary limits.
         # Check if file exists.
+        
         self.map = map_data
         self.xlimit = [0, np.shape(self.map)[0]]
         self.ylimit = [0, np.shape(self.map)[1]]
@@ -96,10 +99,7 @@ class MapEnvironment(object):
         @param end_configs: list of tuples of end confings
         @return 1D  numpy array of distances
         """
-<<<<<<< HEAD
-        end_configs = np.array(end_configs)
-        start_config = np.array(start_config)
-        distances = np.linalg.norm( end_configs - start_config, axis=1)
+        distances = np.linalg.norm(np.array(end_configs) - np.array(start_config), axis=1)
         return distances
 
     def compute_path_length(self, path):
@@ -108,11 +108,6 @@ class MapEnvironment(object):
             dist += self.compute_distances(path[i], np.array(path[i+1]).reshape(-1, 2))
         return dist
 
-=======
-        distances = np.linalg.norm(np.array(end_configs) - np.array(start_config), axis=1)
-        return distances
-
->>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
     def generate_path(self, config1, config2):
         config1 = np.array(config1)[0:2]
         config2 = np.array(config2)[0:2]
@@ -127,10 +122,6 @@ class MapEnvironment(object):
         return waypoints, dist
 
     def get_path_on_graph(self, G, path_nodes):
-<<<<<<< HEAD
-        # print(path_nodes)
-=======
->>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
         plan = []
         for node in path_nodes:
             #plan += [G.nodes[node]["config"]]
@@ -139,13 +130,7 @@ class MapEnvironment(object):
 
         path = []
         xs, ys, yaws = [], [], []
-<<<<<<< HEAD
-        print(plan)
         for i in range(np.shape(plan)[0] - 1):
-            # print(plan[i])
-=======
-        for i in range(np.shape(plan)[0] - 1):
->>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
             path += [self.generate_path(plan[i], plan[i+1])[0]]
 
         return np.concatenate(path, axis=0)
@@ -189,33 +174,17 @@ class MapEnvironment(object):
             #plan += [G.nodes[node]["config"]]
             plan += [node]
         plan = np.array(plan)
-<<<<<<< HEAD
-        # print(plan)
-=======
-
->>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
-        plt.clf()
+        #plt.clf()
         plt.imshow(self.map, interpolation='none', cmap='gray', origin='lower')
 
         # Comment this to hide all edges. This can take long.
         # edges = G.edges()
         # for edge in edges:
-<<<<<<< HEAD
-        #     # config1 = G.nodes[edge[0]]["config"]
-        #     # config2 = G.nodes[edge[1]]["config"]
-=======
-        #     config1 = G.nodes[edge[0]]["config"]
-        #     config2 = G.nodes[edge[1]]["config"]
->>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
         #     x = [config1[0], config2[0]]
         #     y = [config1[1], config2[1]]
         #     plt.plot(y, x, 'grey')
 
         path = self.get_path_on_graph(G, path_nodes)
-<<<<<<< HEAD
-        # print(path)
-=======
->>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
         plt.plot(path[:,1], path[:,0], 'y', linewidth=1)
 
         for vertex in G.nodes:
@@ -234,22 +203,12 @@ class MapEnvironment(object):
         if saveto != "":
             plt.savefig(saveto)
             return
-        plt.show()
+        #plt.show()
 
-    def visualize_graph(self, G, start=None, goal=None, added_node=None, ellipse=None, saveto=""):
+    def visualize_graph(self, G, start=None, goal=None, added_node=None, ellipse=None, path_node=None, saveto=""):
+        plt.clf()
         ax = plt.gca()
         plt.imshow(self.map, interpolation='nearest', origin='lower')
-<<<<<<< HEAD
-        edges = G.edges()
-        for edge in edges:
-            #config1 = G.nodes[edge[0]]["config"]
-            #config2 = G.nodes[edge[1]]["config"]
-            config1 = edge[0]
-            config2 = edge[1]
-            # print("config:", config1, config2)
-            path = self.generate_path(config1, config2)[0]
-            plt.plot(path[:,1], path[:,0], 'w')
-=======
         # edges = G.edges()
         # for edge in edges:
         #     #config1 = G.nodes[edge[0]]["config"]
@@ -258,12 +217,14 @@ class MapEnvironment(object):
         #     config2 = edge[1]
         #     path = self.generate_path(config1, config2)[0]
         #     plt.plot(path[:,1], path[:,0], 'w')
->>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
+
 
         num_nodes = G.number_of_nodes()
         #ax = plt.gca()
-        print 'start', start
-        print 'goal', goal
+        # print 'start', start
+        # print 'goal', goal
+        # print self.state_validity_checker(np.array(added_node))
+
         for i, vertex in enumerate(G.nodes()):
             config = vertex
 
@@ -281,8 +242,12 @@ class MapEnvironment(object):
             else:
                 plt.scatter(config[1], config[0], s=30, c='r')
         if ellipse is not None:
-            ell = Ellipse(*ellipse, color='b', edgecolor='b', linewidth=3, alpha=0.5)
+            ellipse = [[ellipse[0][1], ellipse[0][0]], ellipse[1], ellipse[2], 90 - ellipse[3]]
+            ell = Ellipse(*ellipse, color='pink', linewidth=3, alpha=0.5)
             ax.add_patch(ell)
+        if path_node is not None:
+            print path_node
+            self.visualize_plan(G, path_node, start, goal)
         plt.tight_layout()
 
         if saveto != "":
@@ -290,4 +255,4 @@ class MapEnvironment(object):
             return
         plt.ylabel('x')
         plt.xlabel('y')
-        plt.show() #shape
+        # plt.show() #shape

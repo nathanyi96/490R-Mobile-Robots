@@ -1,14 +1,6 @@
 <launch>
   	<arg name="controller" default="PID" />
-<<<<<<< HEAD
     <include file="$(find lab3)/launch/map_server.launch" />
     <param name="/controller/type" value="$(arg controller)" />
     <node pkg="lab2" name="controller" type="main.py" />
-=======
-    <arg name="map_file" default="$(find lab3)/maps/cse022_w_obstacles.yaml" />
-    <node pkg="map_server" name="map_server" type="map_server" args="$(arg map_file)" ns="/obs"/>
-
-    <param name="/controller/type" value="$(arg controller)"/>
-    <node pkg="lab2" name="controller" type="main.py"/>
->>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
 </launch>

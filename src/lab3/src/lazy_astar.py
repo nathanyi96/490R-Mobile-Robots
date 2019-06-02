@@ -6,11 +6,7 @@ import numpy as np
 import networkx as nx
 import graph_maker
 import IPython
-<<<<<<< HEAD
-def astar_path(G, source, target, weight, heuristic=None, return_dist=True):
-=======
 def astar_path(G, source, target, weight, heuristic=None, return_dist=False):
->>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
     """Return a list of nodes in a shortest path between source and target
     using the A* ("A-star") algorithm.
 
@@ -74,13 +70,7 @@ def astar_path(G, source, target, weight, heuristic=None, return_dist=False):
     # more than once and inserting the node into the queue too many times.
     enqueued = {} # OPEN
     # Maps explored nodes to parent closest to the source.
-<<<<<<< HEAD
     explored = {} # CLOSED#
-    cnt = 0
-=======
-    explored = {} # CLOSED
-
->>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
     while queue:
         # Pop the smallest item from queue.
         _, __, curnode, dist, parent = pop(queue)
@@ -88,10 +78,6 @@ def astar_path(G, source, target, weight, heuristic=None, return_dist=False):
         if curnode in explored:
             continue
         if parent:  # not start node
-<<<<<<< HEAD
-            cnt += 1
-=======
->>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
             validity, _ = weight(parent, curnode)
             if not validity:
                 continue
@@ -102,14 +88,6 @@ def astar_path(G, source, target, weight, heuristic=None, return_dist=False):
                 path.append(node)
                 node = explored[node]
             path.reverse()
-<<<<<<< HEAD
-            # if not return_dist:
-            #     return path
-            print("edges evaluated when searching", cnt)
-=======
-            if not return_dist:
-                return path
->>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
             return path, dist
         explored[curnode] = parent
 

@@ -9,3 +9,7 @@ To run the planner with the robot in sim,
 To run the planner with the robot in real, you need to run the particle filter.
 1. Launch `ParticleFilter.launch`.
 2. In your planner launch file, you should publish `pose_topic` as the topic published from particle filter, i.e. `/pf/viz/inferred_pose` so that `ROSPlanner.py` can take this as the robot's current pose.
+
+Cool Demo of anytime planning!
+
+![](videos/idplan.gif)

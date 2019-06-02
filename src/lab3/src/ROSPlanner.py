@@ -17,6 +17,7 @@ import os
 from matplotlib import pyplot as plt
 import networkx as nx
 
+import IPython
 from DubinsMapEnvironment import DubinsMapEnvironment
 from MapEnvironment import MapEnvironment
 from DubinsSampler import DubinsSampler
@@ -29,11 +30,7 @@ from EllipseSampler import informed_sample
 import time
 class ROSPlanner:
     def __init__(self, heuristic_func, weight_func, num_vertices, connection_radius,
-<<<<<<< HEAD
-        graph_file='ros_graph_test1.pkl', do_shortcut=False, num_goals=1,
-=======
-        graph_file='ros_graph_sparse.pkl', do_shortcut=False, num_goals=1,
->>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
+        graph_file='ros_graph_250.pkl', do_shortcut=False, num_goals=1,
         curvature=0.02, plan_time=2, plan_with_budget=False):
         """
         @param heuristic_func: Heuristic function to be used in lazy_astar
@@ -62,12 +59,8 @@ class ROSPlanner:
         self.time_left = plan_time
         self.plan_with_budget = plan_with_budget
         rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.get_goal)
-<<<<<<< HEAD
         pose_topic = rospy.get_param("planner/pose_topic", '/sim_car_pose/pose')
         rospy.Subscriber(pose_topic, PoseStamped, self.get_current_pose)
-=======
-        rospy.Subscriber('/sim_car_pose/pose', PoseStamped, self.get_current_pose)
->>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
 
         self.multi_goals = num_goals > 1
         self.num_goals = num_goals
@@ -91,21 +84,14 @@ class ROSPlanner:
             #self.planning_env.visualize_graph(self.G, saveto="")
         else:
             print("Generating graph, wait for completion")
-<<<<<<< HEAD
             start_time = time.time()
-=======
->>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
             self.G = graph_maker.make_graph(self.planning_env,
                 sampler=self.sampler,
                 num_vertices=num_vertices,
                 connection_radius=connection_radius,
                 saveto=graph_file,
                 lazy=True)
-
-<<<<<<< HEAD
-            print("t1 = ", time.time() - start_time)
-=======
->>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
+            print("graph generation time:", time.time() - start_time)
             print("visualize graph")
             self.planning_env.visualize_graph(self.G, saveto="graph.png")
 
@@ -120,7 +106,6 @@ class ROSPlanner:
 
         debug_plan = False
         if debug_plan:
-<<<<<<< HEAD
             self.visualiza_plan = False
             self.path_nodes = None
             while not rospy.is_shutdown():
@@ -128,15 +113,6 @@ class ROSPlanner:
                     self.planning_env.visualize_plan(self.G, self.path_nodes,
                             tuple(self.start),tuple(self.goal))
                     self.visualiza_plan = False
-=======
-            self.new_goal = False
-            self.path_nodes = None
-            while not rospy.is_shutdown():
-                if self.new_goal:
-                    self.planning_env.visualize_plan(self.G, self.path_nodes,
-                            tuple(self.start),tuple(self.goal))
-                    self.new_goal = False
->>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
         rospy.spin()
 
 
@@ -155,66 +131,40 @@ class ROSPlanner:
         self.time_left= self.total_planning_time 
         
         start, goal = tuple(start), tuple(goal)
-<<<<<<< HEAD
-
         start_time = time.time()
-=======
->>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
         self.G, _ = graph_maker.add_node(self.G, start, env=self.planning_env,
                 connection_radius=self.connection_radius)
         self.G, _ = graph_maker.add_node(self.G, goal, env=self.planning_env,
                 connection_radius=self.connection_radius)
-<<<<<<< HEAD
         print("t2 = ", time.time() - start_time)
 
         rospy.loginfo('planning from start to goal...')
         start_time = time.time()
         path_nodes, dist = lazy_astar.astar_path(self.G, source=start, target=goal,
-=======
-        rospy.loginfo('planning from start to goal...')
-        start_time = time.time()
-        path_nodes = lazy_astar.astar_path(self.G, source=start, target=goal,
->>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
                 weight=self.weight_func, heuristic=self.heuristic_func, return_dist=self.plan_with_budget)
-        if self.plan_with_budget:
-            dist = path_nodes[1]
-            path_nodes = path_nodes[0]
-<<<<<<< HEAD
         print("planning time = ", time.time() - start_time)
-        # start_time = self.tic_toc(time.time() - start_time)
-        idx = 0 
-        max_sample_num = 32
-=======
         start_time = self.tic_toc(time.time() - start_time)
         idx = 0 
-        max_sample_num = 8
->>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
+        max_sample_num = 4
+        added_nodes = []
         while self.plan_with_budget and self.time_left > 0:
-            added_nodes, ellipse = self.densify_graph(start, goal, dist, max_sample_num / (2 ** idx))
-            self.planning_env.visualize_graph(self.G, start, goal, added_nodes, ellipse, 'densify_{}'.format(idx))
+            added_node, ellipse, start_time = self.densify_graph(start, goal, dist, max_sample_num)
+            added_nodes.extend(added_node)
             path_nodes, dist = lazy_astar.astar_path(self.G, source=start, target=goal,
-<<<<<<< HEAD
-                                weight=self.weight_func, heuristic=self.heuristic_func, return_dist=True)           
+                                weight=self.weight_func, heuristic=self.heuristic_func, return_dist=True)
             self.path_nodes = path_nodes
             self.visualiza_plan = True
-=======
-            weight=self.weight_func, heuristic=self.heuristic_func, return_dist=True)           
-            self.path_nodes = path_nodes
-            self.new_goal = True
->>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
-            if self.do_shortcut:
-                path_nodes = self.planning_env.shortcut(self.G, path_nodes)
-            path = self.planning_env.get_path_on_graph(self.G, path_nodes)
             start_time = self.tic_toc(time.time() - start_time)
-
+            idx += 1
+            self.planning_env.visualize_graph(self.G, start, goal, added_nodes, ellipse, self.path_nodes, 'densify_{}'.format(idx))
+            print 'current minimum distance', dist
+            print 'total connect nodes', len(added_nodes)
+        print 'planning time left', self.time_left
+        
         rospy.loginfo('done planning.')
         self.path_nodes = path_nodes
-<<<<<<< HEAD
         self.visualiza_plan = False
         print('path length before shortcut: {}'.format(dist))
-=======
-        self.new_goal = True
->>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
         if self.do_shortcut:
             path_nodes = self.planning_env.shortcut(self.G, path_nodes)
         path = self.planning_env.get_path_on_graph(self.G, path_nodes)
@@ -225,29 +175,29 @@ class ROSPlanner:
         sample poses and add to graph if h+g <= cost within time limit.
         '''
         start, end = np.array(start_config), np.array(goal_config)
-        distance_min = np.linalg.norm(start - end) 
-        distance_max = min_cost
+        distance_min = np.linalg.norm(start[:2] - end[:2]) 
+        distance_max = min_cost# + distance_min
         
         start_time = self.tic_toc(0.0)
         added_nodes = []
         vertices, ellipse = informed_sample(distance_max, distance_min, start, end, sample_num)
+        angle_step = 3
         for idx in range(sample_num):
-            vertex = vertices[idx]
-            if self.planning_env.state_validity_checker(np.array([vertex])):
-                self.G, _ = graph_maker.add_node(self.G, vertex, env=self.planning_env,
-                connection_radius=min_cost)
-                added_nodes.append(vertex)
-                start_time = self.tic_toc(time.time() - start_time)
-<<<<<<< HEAD
+            for ang in np.linspace(0, 2*np.pi, angle_step, endpoint=False):
+                vertex = (vertices[idx][0], vertices[idx][1], ang + start_config[-1])
+                if self.time_left < 0.2:
+                    break
+                if self.planning_env.state_validity_checker(np.array([vertex])):
+                    self.G, _ = graph_maker.add_node(self.G, vertex, env=self.planning_env,
+                    connection_radius=min_cost)
+                    added_nodes.append(vertex)
+                    start_time = self.tic_toc(time.time() - start_time)
+
+
         # self.G, _ = graph_maker.add_nodes_parallel(self.G, vertices, env=self.planning_env,
         #       connection_radius=min_cost)
         # added_nodes = vertices
-        # print 'densify time'
-        # start_time = self.tic_toc(time.time() - start_time)
-        return vertices, ellipse
-=======
-        return added_nodes, ellipse
->>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
+        return added_nodes, ellipse, start_time
 
     def plan_multi_goals(self, start):
         """
@@ -304,11 +254,7 @@ class ROSPlanner:
         print("prepare to send waypoints", len(waypoints))
         h = Header()
         h.stamp = rospy.Time.now()
-<<<<<<< HEAD
-        desired_speed = 0.5
-=======
         desired_speed = 1.0
->>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
 
         speeds = np.zeros(len(waypoints))
         speeds[:] = desired_speed
@@ -433,18 +379,9 @@ class ROSPlanner:
 
 
 if __name__ == '__main__':
-<<<<<<< HEAD
     do_shortcut = rospy.get_param("planner/do_shortcut", True)
-    num_goals = int(rospy.get_param("planner/goals", 3))
-    heuristic = lambda n1, n2, env, G: env.compute_heuristic(n1, n2)
-    weight = lambda n1, n2, env, G: env.edge_validity_checker(n1, n2)
-    ROSPlanner(heuristic, weight, num_vertices=250, connection_radius=1000, do_shortcut=do_shortcut, num_goals=num_goals, 
-            plan_time=2, plan_with_budget=False, curvature=0.018) # 250 500
-=======
-    do_shortcut = rospy.get_param("planner/do_shortcut", False)
     num_goals = int(rospy.get_param("planner/goals", 1))
     heuristic = lambda n1, n2, env, G: env.compute_heuristic(n1, n2)
     weight = lambda n1, n2, env, G: env.edge_validity_checker(n1, n2)
-    ROSPlanner(heuristic, weight, num_vertices=30, connection_radius=1000, do_shortcut=do_shortcut, num_goals=num_goals, 
-            plan_time=2, plan_with_budget=True) # 250 500
->>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
+    ROSPlanner(heuristic, weight, num_vertices=250, connection_radius=1000, do_shortcut=do_shortcut, num_goals=num_goals, 
+            plan_time=10, plan_with_budget=False, curvature=0.018) # 250 500

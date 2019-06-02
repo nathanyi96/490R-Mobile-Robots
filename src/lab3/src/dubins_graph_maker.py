@@ -187,7 +187,6 @@ def add_node(G, config, env, connection_radius):
 
     return G, config
     #return G, index
-<<<<<<< HEAD
 
 def add_nodes_parallel(G, configs, env, connection_radius):
     """
@@ -211,6 +210,4 @@ def add_nodes_parallel(G, configs, env, connection_radius):
             p.start()
         for p in i:
             p.join()
-    return G, configs
-=======
->>>>>>> a7e57bfd30cce53a52a585e8e419a8029de5343d
+    return G, configssub
