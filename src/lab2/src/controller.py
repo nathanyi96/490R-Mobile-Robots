@@ -8,6 +8,7 @@ class BaseController(object):
         self.path = np.array([])
         self._ready = False
         self.B = 0.33 # car length
+        self.prev_idx = 0
 
     def ready(self):
         '''
@@ -30,7 +31,8 @@ class BaseController(object):
             self.reset_state()
             self._ready = True
             self.waypoint_diff = np.average(np.linalg.norm(np.diff(self.path[:, :2], axis=0), axis=1))
-
+            self.prev_idx = 0
+            
     def path_complete(self, pose, error):
         '''
         path_complete computes whether the vehicle has completed the path

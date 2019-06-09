@@ -6,7 +6,6 @@ import os
 from ackermann_msgs.msg import AckermannDriveStamped
 from geometry_msgs.msg import PoseStamped, PoseArray, Pose, PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Empty
 from std_msgs.msg import Header, Float32
 from std_srvs.srv import Empty as SrvEmpty
 from lab2.msg import XYHVPath, XYHVPath_log
@@ -108,9 +107,11 @@ class ControlNode:
         rate = rospy.Rate(50) # 50 in sim, 8 in real with PF
         self.inferred_pose = None
         print "Control Node Initialized"
+        rospy.loginfo('start')
         while not rospy.is_shutdown():
             self.path_event.wait()
             self.reset_lock.acquire()
+            rospy.loginfo('run')
             ip = self.inferred_pose
             if ip is not None and self.controller.ready():
                 index = self.controller.get_reference_index(ip)
@@ -126,6 +127,8 @@ class ControlNode:
                 if self.controller.path_complete(ip, error):
                     # self.log_error()
                     self.path_event.clear()
+                    # self.notifyComplete()
+                    # call manager/complete service
             self.reset_lock.release()
             rate.sleep()
 
@@ -152,6 +155,9 @@ class ControlNode:
         #         XYHVPath_log, self.cb_path_log, queue_size=1)
         rospy.Service("/controller/follow_path", FollowPath, self.cb_path)
         #rospy.Service("/controller/follow_path_log", FollowPath_log, self.cb_path_log)
+
+        self.notifyComplete = rospy.ServiceProxy("path_manager/path_complete", SrvEmpty)
+
         rospy.Subscriber(rospy.get_param("~pose_topic", "/sim_car_pose/pose"),
                              PoseStamped, self.cb_pose, queue_size=10)
 

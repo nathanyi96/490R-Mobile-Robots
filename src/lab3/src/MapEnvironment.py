@@ -132,7 +132,6 @@ class MapEnvironment(object):
         xs, ys, yaws = [], [], []
         for i in range(np.shape(plan)[0] - 1):
             path += [self.generate_path(plan[i], plan[i+1])[0]]
-
         return np.concatenate(path, axis=0)
 
     def shortcut(self, G, waypoints, num_trials=10):
@@ -164,7 +163,7 @@ class MapEnvironment(object):
         return waypoints
 
 
-    def visualize_plan(self, G, path_nodes, start=None, goal=None, saveto=""):
+    def visualize_plan(self, G, path_nodes, start=None, goal=None, saveto="", plot_edges=False):
         '''
         Visualize the final path
         @param plan Sequence of states defining the plan.
@@ -178,11 +177,12 @@ class MapEnvironment(object):
         plt.imshow(self.map, interpolation='none', cmap='gray', origin='lower')
 
         # Comment this to hide all edges. This can take long.
-        # edges = G.edges()
-        # for edge in edges:
-        #     x = [config1[0], config2[0]]
-        #     y = [config1[1], config2[1]]
-        #     plt.plot(y, x, 'grey')
+        if plot_edges:
+            edges = G.edges()
+            for edge in edges:
+                x = [config1[0], config2[0]]
+                y = [config1[1], config2[1]]
+                plt.plot(y, x, 'grey')
 
         path = self.get_path_on_graph(G, path_nodes)
         plt.plot(path[:,1], path[:,0], 'y', linewidth=1)
@@ -202,21 +202,22 @@ class MapEnvironment(object):
 
         if saveto != "":
             plt.savefig(saveto)
-            return
-        #plt.show()
+        else:
+            plt.show()
 
-    def visualize_graph(self, G, start=None, goal=None, added_node=None, ellipse=None, path_node=None, saveto=""):
+    def visualize_graph(self, G, start=None, goal=None, added_node=None, ellipse=None, path_node=None, saveto="", plot_edges=False):
         plt.clf()
         ax = plt.gca()
         plt.imshow(self.map, interpolation='nearest', origin='lower')
-        # edges = G.edges()
-        # for edge in edges:
-        #     #config1 = G.nodes[edge[0]]["config"]
-        #     #config2 = G.nodes[edge[1]]["config"]
-        #     config1 = edge[0]
-        #     config2 = edge[1]
-        #     path = self.generate_path(config1, config2)[0]
-        #     plt.plot(path[:,1], path[:,0], 'w')
+        if plot_edges:
+            edges = G.edges()
+            for edge in edges:
+                #config1 = G.nodes[edge[0]]["config"]
+                #config2 = G.nodes[edge[1]]["config"]
+                config1 = edge[0]
+                config2 = edge[1]
+                path = self.generate_path(config1, config2)[0]
+                plt.plot(path[:,1], path[:,0], 'w')
 
 
         num_nodes = G.number_of_nodes()
@@ -247,12 +248,12 @@ class MapEnvironment(object):
             ax.add_patch(ell)
         if path_node is not None:
             print path_node
-            self.visualize_plan(G, path_node, start, goal)
+            self.visualize_plan(G, path_node, start, goal, saveto=saveto)
         plt.tight_layout()
 
         if saveto != "":
             plt.savefig(saveto)
-            return
-        plt.ylabel('x')
-        plt.xlabel('y')
-        # plt.show() #shape
+        else:
+            plt.ylabel('x')
+            plt.xlabel('y')
+            plt.show() #shape

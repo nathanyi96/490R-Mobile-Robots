@@ -1,7 +1,7 @@
 import numpy as np
 import rospy
-
 from controller import BaseController
+import IPython
 
 
 # Uses Proportional-Differential Control from
@@ -9,16 +9,20 @@ from controller import BaseController
 class NonLinearController(BaseController):
     def __init__(self):
         super(NonLinearController, self).__init__()
-
         self.reset_params()
         self.reset_state()
 
     def get_reference_index(self, pose):
-
+        # hack: check if there's a gap in reference index
         with self.path_lock:
+            thre = 30
+            init_idx = max(self.prev_idx - thre, 0) 
             dist = np.sqrt(np.sum(((self.path[:,0:2] - pose[0:2])**2), axis=1))
-            idx = np.argmin(dist)
-            return (idx if (idx == len(self.path)-1) else idx+1)
+            dist = np.sqrt(np.sum(((self.path[init_idx:init_idx+thre,0:2] - pose[0:2])**2), axis=1))
+            idx = np.argmin(dist) + init_idx 
+            rospy.loginfo('idx: {}'.format(idx))
+            self.prev_idx = (idx if (idx == len(self.path)-1) else idx+1)
+            return self.prev_idx
 
     def get_control(self, pose, index):
         pose_ref = self.get_reference_pose(index)

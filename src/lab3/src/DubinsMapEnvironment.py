@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib
 from matplotlib import pyplot as plt
-from Dubins import dubins_path_planning
+import dubins
 from MapEnvironment import MapEnvironment
 
 class DubinsMapEnvironment(MapEnvironment):
@@ -17,13 +17,13 @@ class DubinsMapEnvironment(MapEnvironment):
         @param end_configs: list of tuples of end confings
         @return numpy array of distances
         """
-        start_config, end_configs = np.array(start_config), np.array(end_configs)
-        num = end_configs.shape[0]
-        distances = np.zeros(num)
         # Implement here
+        turning_radius = 1.0 / self.curvature
+        num = len(end_configs)
+        distances = np.empty(num)
         for i in range(num):
-            _1,_2,_3, distance = dubins_path_planning(start_config, end_configs[i], self.curvature)
-            distances[i] = distance
+            path = dubins.shortest_path(start_config, end_configs[i], turning_radius)
+            distances[i] = path.path_length()
         return distances
 
     def compute_heuristic(self, config, goal):
@@ -32,10 +32,8 @@ class DubinsMapEnvironment(MapEnvironment):
         """
 
         # Implement here
-
-        config, goal = np.array(config), np.array(goal)
-        _1, _2, _3, heuristic = dubins_path_planning(config, goal, self.curvature)
-        return heuristic
+        path = dubins.shortest_path(config, goal, 1.0 / self.curvature)
+        return path.path_length()
 
     def generate_path(self, config1, config2):
         """
@@ -44,9 +42,6 @@ class DubinsMapEnvironment(MapEnvironment):
         Use dubins_path_planning to get a path
         return: (numpy array of [x, y, yaw], curve length)
         """
-
-        # Implement here
-
-        ppx, ppy, ppyaw, path_length = dubins_path_planning(config1, config2, self.curvature)
-        path = np.stack((ppx, ppy, ppyaw), axis=1)
-        return path, path_length
+        path = dubins.shortest_path(config1, config2, 1.0 / self.curvature)
+        configs, _ = path.sample_many(0.2)
+        return np.array(configs), path.path_length()

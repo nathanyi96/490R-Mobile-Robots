@@ -1,38 +1,34 @@
 #!/usr/bin/env python
+import os
+import time
+import pickle
+import numpy as np
+import matplotlib.pyplot as plt
 
+import rospy
 from nav_msgs.srv import GetPlan
 from nav_msgs.srv import GetMap
 
 from std_msgs.msg import Header
 from geometry_msgs.msg import PoseStamped, PointStamped
 from nav_msgs.msg import Odometry
-
 from lab2.msg import XYHV, XYHVPath
-from lab2.srv import FollowPath
+from lab2.srv import *
 
-import numpy as np
-from scipy import signal
-import rospy
-import os
-from matplotlib import pyplot as plt
-import networkx as nx
-
-import IPython
-from DubinsMapEnvironment import DubinsMapEnvironment
-from MapEnvironment import MapEnvironment
-from DubinsSampler import DubinsSampler
-import dubins_graph_maker as graph_maker
-import pickle
 import util
 import lazy_astar
-from Sampler import Sampler
+from DubinsMapEnvironment import DubinsMapEnvironment
+from DubinsSampler import DubinsSampler
+import dubins_graph_maker as graph_maker
 from EllipseSampler import informed_sample
-import time
+import IPython
+
 class ROSPlanner:
+
     def __init__(self, heuristic_func, weight_func, num_vertices, connection_radius,
-        graph_file='ros_graph.pkl', do_shortcut=False, num_goals=1,
+        graph_file='ros_graph_sparse.pkl', do_shortcut=False, num_goals=1,
         curvature=0.02, plan_time=2, plan_with_budget=False):
-        """`
+        """
         @param heuristic_func: Heuristic function to be used in lazy_astar
         @param weight_func: Weight function to be used in lazy_astar
         @param num_vertices: Number of vertices in the graph
@@ -43,7 +39,6 @@ class ROSPlanner:
         @param num_goals: If > 1, takes multiple goals
 
         """
-
         rospy.init_node('planner', anonymous=True)
 
         # load map
@@ -58,16 +53,9 @@ class ROSPlanner:
         self.total_planning_time = plan_time
         self.time_left = plan_time
         self.plan_with_budget = plan_with_budget
-        rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.get_goal)
-        pose_topic = rospy.get_param("planner/pose_topic", '/sim_car_pose/pose')
-        rospy.Subscriber(pose_topic, PoseStamped, self.get_current_pose)
+        rospy.Service("/planner/generate_path", GeneratePath, self.gen_path)
 
-        self.multi_goals = num_goals > 1
         self.num_goals = num_goals
-        if self.multi_goals:
-            print("Accept multiple goals")
-            self.goals = []
-            self.route_sent = False
 
         self.do_shortcut = do_shortcut
 
@@ -97,11 +85,10 @@ class ROSPlanner:
 
         self.num_vertices = num_vertices
         self.connection_radius = connection_radius
-
         self.heuristic_func = lambda n1, n2: heuristic_func(n1, n2, self.planning_env, self.G)
         self.weight_func = lambda n1, n2: weight_func(n1, n2, self.planning_env, self.G)
 
-        print("Ready to take goals")
+        print "Ready to take goals"
         self.curvature = curvature
 
         debug_plan = False
@@ -120,6 +107,27 @@ class ROSPlanner:
         self.time_left -= last_time
         print 'time left', self.time_left
         return time.time()
+    
+    def gen_path(self, req):
+        return self.plan_to_goal(req)
+
+    def gen_path(self, req):
+        """
+        Plan a path from start to goal
+        Return a path
+        """
+        # Implement here
+        # Plan with lazy_astar
+        start = self.world2map(np.array([util.rospose_to_posetup(req.start)]))
+        goal = self.world2map(np.array([util.rospose_to_posetup(req.goal)]))
+        start, goal = tuple(start[0]), tuple(goal[0])
+        map_points = self.plan_to_goal(start, goal)
+        if map_points is not None and len(map_points) > 0:
+            world_points = self.map2world(map_points)
+            path = self.toXYHVPath(world_points)
+            return GeneratePathResponse(path)
+        
+
 
     def plan_to_goal(self, start, goal):
         """
@@ -170,6 +178,7 @@ class ROSPlanner:
         path = self.planning_env.get_path_on_graph(self.G, path_nodes)
         return path
 
+
     def densify_graph(self, start_config, goal_config, min_cost, sample_num):
         '''
         sample poses and add to graph if h+g <= cost within time limit.
@@ -199,59 +208,7 @@ class ROSPlanner:
         # added_nodes = vertices
         return added_nodes, ellipse, start_time
 
-    def plan_multi_goals(self, start):
-        """
-        Plan a route from start to self.goals
-        Return a path connecting them.
-        """
-        path = [] # contains nodes
-        print("start plan multiple goals")
-        for goal in self.goals:
-            path.append(self.plan_to_goal(start, goal))
-            start = goal
-        return np.concatenate(path, axis=0)
-
-    def get_goal(self, msg):
-        """
-        - plan in map frame  - execute in world frame
-        don't forget tranform back to world frame
-        """
-        print("Got a new goal\n{}".format(msg.pose))
-        goal_pose = util.rospose_to_posetup(msg.pose)
-        self.goal = self.world2map(np.array([goal_pose]))[0]
-
-        start_pose = util.rospose_to_posetup(self.current_pose)
-        self.start = self.world2map(np.array([start_pose]))[0]
-        print("goal and start:", self.goal, self.start)
-
-        map_points = None
-
-        if self.multi_goals:
-            if self.route_sent:
-                self.route_sent = False
-                self.goals = []
-            self.goals += [self.goal.copy()]
-            if len(self.goals) == self.num_goals:
-                print("Got the final goal for mutli goal. Planning for multiple goals")
-                map_points = self.plan_multi_goals(self.start)
-            else:
-                print("Got {}/{} goals.".format(len(self.goals), self.num_goals))
-        else:
-            print("start single goal")
-            map_points = self.plan_to_goal(self.start, self.goal)
-        if map_points is not None and len(map_points) > 0:
-            world_points = self.map2world(map_points)
-            success = self.send_path(np.array(world_points))
-            print("Sent path")
-
-    def get_current_pose(self, msg):
-        self.current_pose = msg.pose
-        if self.goals and len(self.goals) == self.num_goals:
-            self.goals = [] # clear
-        self.goal = None
-
-    def send_path(self, waypoints):
-        print("prepare to send waypoints", len(waypoints))
+    def toXYHVPath(self, waypoints):
         h = Header()
         h.stamp = rospy.Time.now()
         desired_speed = 1.0
@@ -261,12 +218,7 @@ class ROSPlanner:
         speeds[-1] = 0.0
         path = XYHVPath(h,[XYHV(*[waypoint[0], waypoint[1], waypoint[2], speed]) \
                 for waypoint, speed in zip(waypoints, speeds)])
-
-        print "Sending path..."
-        controller = rospy.ServiceProxy("/controller/follow_path", FollowPath())
-        success = controller(path)
-        print "Controller started.", success
-        return success
+        return path
 
     def get_map(self):
         '''
@@ -303,7 +255,6 @@ class ROSPlanner:
         # With values 0: not permissible, 1: permissible
         pr[array_255 == 0] = 1
         pr = np.logical_not(pr)  # 0 is permissible, 1 is not
-
         return pr
 
     def world2map(self, poses):
@@ -377,13 +328,12 @@ class ROSPlanner:
         print ys.min(), ys.max()+1
 
 
-
 if __name__ == '__main__':
     do_shortcut = rospy.get_param("planner/do_shortcut", True)
-    num_goals = int(rospy.get_param("planner/goals", 5))
+    num_goals = int(rospy.get_param("planner/goals", 1))
     heuristic = lambda n1, n2, env, G: env.compute_heuristic(n1, n2)
     weight = lambda n1, n2, env, G: env.edge_validity_checker(n1, n2)
-    ROSPlanner(heuristic, weight, num_vertices=500, connection_radius=1000, do_shortcut=do_shortcut, num_goals=num_goals, 
-            plan_time=1, plan_with_budget=False, curvature=0.018) # 250 500
+    ROSPlanner(heuristic, weight, num_vertices=40, connection_radius=1000, do_shortcut=do_shortcut, num_goals=num_goals, 
+            plan_time=10, plan_with_budget=False, curvature=0.018) # 250 500
     
 

@@ -51,7 +51,7 @@ if __name__ == "__main__":
         connection_radius=args.connection_radius)
 
     # Uncomment this to visualize the graph
-    planning_env.visualize_graph(G,start_id, goal_id)
+    planning_env.visualize_graph(G, start_id, goal_id)
 
     try:
         heuristic = lambda n1, n2: planning_env.compute_heuristic(
