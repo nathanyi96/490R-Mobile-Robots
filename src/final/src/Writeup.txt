@@ -1,3 +1,9 @@
-Algorithm. For optimal path planning, we used a greedy algorithm that uses the Euclidean distance metric to determine the order that the waypoint goals should be navigated. We also use Dubins path planning algorithm to generate waypoints for paths between goal waypoints. Furthermore, we use cubic splining among the goal waypoints to determine optimal orientations and curvatures for Dubins path planning between goal waypoints.
+Design. Initially, we attempted to use random orientations for Dubins path curvature, but such a design resulted in suboptimal paths, i.e. longer paths due to excessive turning. We ended up using cubic splicing to improve Dubins path planning.
 
-Architecture. We implemented a ROS PathManagerNode that handles multiple waypoint goal path planning. The node calls on the ROSPLannerFinal (similar to ROSPlanner in lab2) to generate Dubin's path waypoints between goal waypoints and calls on the controller to execute the path.
+Algorithm. For optimal path planning, we used a greedy algorithm that uses the Euclidean distance metric to determine the order that the waypoint goals should be navigated. We also use Dubins path planning algorithm to generate waypoints for paths between goal waypoints. Furthermore, we use cubic splining among the goal waypoints to determine optimal orientations and curvatures for Dubins path planning between goal waypoints. The path waypoints are sent to a Lyapunov controller that executes the path.
+
+Architecture. We implemented a ROS PathManagerNode that handles multiple waypoint goal path planning. The node calls on the ROSPLannerFinal (similar to ROSPlanner in lab2) to generate Dubin's path waypoints between goal waypoints and calls on the Lyapunov controller to execute the path.
+
+Testing and visualiation. We wrote code to test racecar multi-waypoint path planning and also wrote some plotting code to visualize the results.
+
+Results and modifications. Often times, we noticed that racecar planning in simulation would work fine but would collide with the map environment, e.g. walls, forcing to manually tune input curvature for Dubins path planning.
