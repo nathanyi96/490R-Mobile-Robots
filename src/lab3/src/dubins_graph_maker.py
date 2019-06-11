@@ -5,7 +5,6 @@ import os
 import time
 from tqdm import tqdm
 import multiprocessing as mp
-from Dubins import dubins_path_planning
 assert(nx.__version__ == '2.2' or nx.__version__ == '2.1' or nx.__version__ == '2.3')
 
 def load_graph(filename):
@@ -121,10 +120,10 @@ def add_node_lazy(G, config, env, connection_radius):
     edge_list = []
     for node in G.nodes():
         dist = env.compute_heuristic(config, node)
-        if dist <= connection_radius:
+        if 1e-8 < dist <= connection_radius:
             edge_list.append((config, node, dist))
         dist = env.compute_heuristic(node, config)
-        if dist <= connection_radius:
+        if 1e-8 < dist <= connection_radius:
             edge_list.append((node, config, dist))
     G.add_weighted_edges_from(edge_list)
     return G, config

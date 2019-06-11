@@ -9,7 +9,7 @@ from nav_msgs.msg import Odometry
 from std_msgs.msg import Header, Float32
 from std_srvs.srv import Empty as SrvEmpty
 from lab2.msg import XYHVPath, XYHVPath_log
-from lab2.srv import FollowPath, FollowPath_log
+from lab2.srv import FollowPath, FollowPath_log, StampedFollowPath
 from visualization_msgs.msg import Marker
 
 import csv
@@ -127,7 +127,7 @@ class ControlNode:
                 if self.controller.path_complete(ip, error):
                     # self.log_error()
                     self.path_event.clear()
-                    # self.notifyComplete()
+                    self.notifyComplete()
                     # call manager/complete service
             self.reset_lock.release()
             rate.sleep()

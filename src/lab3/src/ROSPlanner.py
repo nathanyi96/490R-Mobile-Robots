@@ -128,8 +128,8 @@ class ROSPlanner:
         """
         # Implement here
         # Plan with lazy_astar
-        self.time_left= self.total_planning_time 
-        
+        self.time_left= self.total_planning_time
+
         start, goal = tuple(start), tuple(goal)
         start_time = time.time()
         self.G, _ = graph_maker.add_node(self.G, start, env=self.planning_env,
@@ -144,7 +144,7 @@ class ROSPlanner:
                 weight=self.weight_func, heuristic=self.heuristic_func, return_dist=self.plan_with_budget)
         print "planning time = ", time.time() - start_time
         start_time = self.tic_toc(time.time() - start_time)
-        idx = 0 
+        idx = 0
         max_sample_num = 16
         added_nodes = []
         while self.plan_with_budget and self.time_left > 0:
@@ -160,7 +160,7 @@ class ROSPlanner:
             print 'current minimum distance', dist
             print 'total connect nodes', len(added_nodes)
         print 'planning time left', self.time_left
-        
+
         rospy.loginfo('done planning.')
         self.path_nodes = path_nodes
         self.visualiza_plan = False
@@ -175,9 +175,9 @@ class ROSPlanner:
         sample poses and add to graph if h+g <= cost within time limit.
         '''
         start, end = np.array(start_config), np.array(goal_config)
-        distance_min = np.linalg.norm(start[:2] - end[:2]) 
+        distance_min = np.linalg.norm(start[:2] - end[:2])
         distance_max = min_cost# + distance_min
-        
+
         start_time = self.tic_toc(0.0)
         added_nodes = []
         vertices, ellipse = informed_sample(distance_max, distance_min, start, end, sample_num)
@@ -383,7 +383,7 @@ if __name__ == '__main__':
     num_goals = int(rospy.get_param("planner/goals", 5))
     heuristic = lambda n1, n2, env, G: env.compute_heuristic(n1, n2)
     weight = lambda n1, n2, env, G: env.edge_validity_checker(n1, n2)
-    ROSPlanner(heuristic, weight, num_vertices=500, connection_radius=1000, do_shortcut=do_shortcut, num_goals=num_goals, 
+    ROSPlanner(heuristic, weight, num_vertices=500, connection_radius=1000, do_shortcut=do_shortcut, num_goals=num_goals,
             plan_time=1, plan_with_budget=False, curvature=0.018) # 250 500
-    
+
 

@@ -18,7 +18,7 @@ class DubinsSampler:
         """
 
         start_time = time.time()
-        n_headings = 3
+        n_headings = 4
         step = 2*np.pi / n_headings
         n_xy = (num_samples-1) // n_headings + 1
         samples = np.empty((n_xy * n_headings, 3))
@@ -64,7 +64,7 @@ class DubinsSampler:
 
 
     def sample_valid_xy_halton(self, num_samples):
-        SAMPLING_FACTOR = 2
+        SAMPLING_FACTOR = 5
         samples = np.array(h.halton(2, SAMPLING_FACTOR*num_samples))
         start = np.array([[self.xlimit[0], self.ylimit[0]]])
         end = np.array([[self.xlimit[1], self.ylimit[1]]])

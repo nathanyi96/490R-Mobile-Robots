@@ -208,6 +208,9 @@ class MapEnvironment(object):
     def visualize_graph(self, G, start=None, goal=None, added_node=None, ellipse=None, path_node=None, saveto="", plot_edges=False):
         plt.clf()
         ax = plt.gca()
+        # hard coded
+        bound = [[1767, 2223], [2312, 2793]]
+
         plt.imshow(self.map, interpolation='nearest', origin='lower')
         if plot_edges:
             edges = G.edges()
@@ -249,8 +252,9 @@ class MapEnvironment(object):
         if path_node is not None:
             print path_node
             self.visualize_plan(G, path_node, start, goal, saveto=saveto)
-        plt.tight_layout()
-
+        plt.xlim(bound[1])
+        plt.ylim(bound[0])
+        #plt.tight_layout()
         if saveto != "":
             plt.savefig(saveto)
         else:

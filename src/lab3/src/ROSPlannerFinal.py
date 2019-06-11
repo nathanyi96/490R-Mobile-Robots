@@ -4,6 +4,7 @@ import time
 import pickle
 import numpy as np
 import matplotlib.pyplot as plt
+from networkx import NetworkXNoPath
 
 import rospy
 from nav_msgs.srv import GetPlan
@@ -26,7 +27,7 @@ import IPython
 class ROSPlanner:
 
     def __init__(self, heuristic_func, weight_func, num_vertices, connection_radius,
-        graph_file='ros_graph_sparse.pkl', do_shortcut=False, num_goals=1,
+        graph_file='ros_graph.pkl', do_shortcut=False, num_goals=1,
         curvature=0.02, plan_time=2, plan_with_budget=False):
         """
         @param heuristic_func: Heuristic function to be used in lazy_astar
@@ -54,6 +55,7 @@ class ROSPlanner:
         self.time_left = plan_time
         self.plan_with_budget = plan_with_budget
         rospy.Service("/planner/generate_path", GeneratePath, self.gen_path)
+        # np.save('MapData.npy', self.map_data)
 
         self.num_goals = num_goals
 
@@ -65,7 +67,7 @@ class ROSPlanner:
         # to tightly hold all permissible grids.
         self.tight_sampling_limits(self.planning_env)
         self.sampler = DubinsSampler(self.planning_env)
-
+        
         if os.path.exists(graph_file):
             print("Opening {}".format(graph_file))
             self.G = graph_maker.load_graph(graph_file)
@@ -105,7 +107,7 @@ class ROSPlanner:
 
     def tic_toc(self, last_time):
         self.time_left -= last_time
-        print 'time left', self.time_left
+       #  print 'time left', self.time_left
         return time.time()
     
     def gen_path(self, req):
@@ -121,13 +123,15 @@ class ROSPlanner:
         start = self.world2map(np.array([util.rospose_to_posetup(req.start)]))
         goal = self.world2map(np.array([util.rospose_to_posetup(req.goal)]))
         start, goal = tuple(start[0]), tuple(goal[0])
+
         map_points = self.plan_to_goal(start, goal)
         if map_points is not None and len(map_points) > 0:
             world_points = self.map2world(map_points)
-            path = self.toXYHVPath(world_points)
-            return GeneratePathResponse(path)
+            path = self.toXYHVPath(world_points, req.backward)
+            return GeneratePathResponse(path, True)
+        else:
+            return GeneratePathResponse(None, False)
         
-
 
     def plan_to_goal(self, start, goal):
         """
@@ -144,29 +148,40 @@ class ROSPlanner:
                 connection_radius=self.connection_radius)
         self.G, _ = graph_maker.add_node(self.G, goal, env=self.planning_env,
                 connection_radius=self.connection_radius)
-        print("t2 = ", time.time() - start_time)
+        print("t2 = ", rospy.get_time() - start_time)
 
-        rospy.loginfo('planning from start to goal...')
-        start_time = time.time()
-        path_nodes, dist = lazy_astar.astar_path(self.G, source=start, target=goal,
+        rospy.loginfo('planning from start to goal begin time: {}'.format(time.time()))
+        start_time =rospy.get_time()
+        try:
+            path_nodes, dist = lazy_astar.astar_path(self.G, source=start, target=goal,
                 weight=self.weight_func, heuristic=self.heuristic_func, return_dist=self.plan_with_budget)
-        print "planning time = ", time.time() - start_time
-        start_time = self.tic_toc(time.time() - start_time)
+        except NetworkXNoPath:
+            return None
+        print "planning time = ", rospy.get_time() - start_time
+        rospy.loginfo('done time: {}'.format(rospy.get_time()))
+        start_time = self.tic_toc(rospy.get_time()- start_time)
         idx = 0 
-        max_sample_num = 16
+        max_sample_num = 10
         added_nodes = []
         while self.plan_with_budget and self.time_left > 0:
             added_node, ellipse, start_time = self.densify_graph(start, goal, dist, max_sample_num)
             added_nodes.extend(added_node)
-            path_nodes, dist = lazy_astar.astar_path(self.G, source=start, target=goal,
+            try:
+                path_nodes, dist = lazy_astar.astar_path(self.G, source=start, target=goal,
                                 weight=self.weight_func, heuristic=self.heuristic_func, return_dist=True)
+            except NetworkXNoPath:
+                # avoid replacing the old path
+                IPython.embed()
+                self.remove_nodes(added_nodes)
+                added_nodes = []
+                continue
             self.path_nodes = path_nodes
             self.visualiza_plan = True
             start_time = self.tic_toc(time.time() - start_time)
             idx += 1
-            self.planning_env.visualize_graph(self.G, start, goal, added_nodes, ellipse, self.path_nodes, 'densify_{}'.format(idx))
-            print 'current minimum distance', dist
-            print 'total connect nodes', len(added_nodes)
+            # self.planning_env.visualize_graph(self.G, start, goal, added_nodes, ellipse, self.path_nodes, 'densify_{}'.format(idx))
+            print 'current min distance: {}, added node: {}'.format(dist, len(added_nodes))
+        
         print 'planning time left', self.time_left
         
         rospy.loginfo('done planning.')
@@ -176,8 +191,12 @@ class ROSPlanner:
         if self.do_shortcut:
             path_nodes = self.planning_env.shortcut(self.G, path_nodes)
         path = self.planning_env.get_path_on_graph(self.G, path_nodes)
+        self.remove_nodes(added_nodes)
         return path
 
+    def remove_nodes(self, added_nodes):
+        for node in added_nodes:
+            self.G.remove_node(node)
 
     def densify_graph(self, start_config, goal_config, min_cost, sample_num):
         '''
@@ -190,25 +209,21 @@ class ROSPlanner:
         start_time = self.tic_toc(0.0)
         added_nodes = []
         vertices, ellipse = informed_sample(distance_max, distance_min, start, end, sample_num)
-        angle_step = 3
+        angle_step = 5
         for idx in range(sample_num):
             for ang in np.linspace(0, 2*np.pi, angle_step, endpoint=False):
                 vertex = (vertices[idx][0], vertices[idx][1], ang + start_config[-1])
-                if self.time_left < 0.2:
-                    break
                 if self.planning_env.state_validity_checker(np.array([vertex])):
-                    self.G, _ = graph_maker.add_node(self.G, vertex, env=self.planning_env,
+                    self.G, _ = graph_maker.add_node_lazy(self.G, vertex, env=self.planning_env,
                     connection_radius=min_cost)
                     added_nodes.append(vertex)
                     start_time = self.tic_toc(time.time() - start_time)
-
-
         # self.G, _ = graph_maker.add_nodes_parallel(self.G, vertices, env=self.planning_env,
         #       connection_radius=min_cost)
         # added_nodes = vertices
         return added_nodes, ellipse, start_time
 
-    def toXYHVPath(self, waypoints):
+    def toXYHVPath(self, waypoints, backward=False):
         h = Header()
         h.stamp = rospy.Time.now()
         desired_speed = 1.0
@@ -333,7 +348,7 @@ if __name__ == '__main__':
     num_goals = int(rospy.get_param("planner/goals", 1))
     heuristic = lambda n1, n2, env, G: env.compute_heuristic(n1, n2)
     weight = lambda n1, n2, env, G: env.edge_validity_checker(n1, n2)
-    ROSPlanner(heuristic, weight, num_vertices=40, connection_radius=1000, do_shortcut=do_shortcut, num_goals=num_goals, 
-            plan_time=10, plan_with_budget=False, curvature=0.018) # 250 500
+    ROSPlanner(heuristic, weight, num_vertices=300, connection_radius=200, do_shortcut=do_shortcut, num_goals=num_goals, 
+            plan_time=0.5, plan_with_budget=False, curvature=0.075) # 250 500
     
 

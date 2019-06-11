@@ -61,6 +61,9 @@ add_service_files(
   FollowPath.srv
   FollowPath_log.srv
   GeneratePath.srv
+  SignalPathComplete.srv
+  StampedFollowPath.srv
+  ReadFile.srv
 )
 
 ## Generate actions in the 'action' folder

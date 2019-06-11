@@ -1,7 +1,7 @@
 import numpy as np
 import threading
-
-
+import IPython
+import rospy
 class BaseController(object):
     def __init__(self):
         self.path_lock = threading.RLock()
@@ -31,8 +31,8 @@ class BaseController(object):
             self.reset_state()
             self._ready = True
             self.waypoint_diff = np.average(np.linalg.norm(np.diff(self.path[:, :2], axis=0), axis=1))
-            self.prev_idx = 0
-            
+            self.prev_idx = -1
+
     def path_complete(self, pose, error):
         '''
         path_complete computes whether the vehicle has completed the path
@@ -47,8 +47,8 @@ class BaseController(object):
                 reached the end of the path
         '''
         err_l2 = np.linalg.norm(error)
-        # return (self.get_reference_index(pose) == (len(self.path) - 1) and err_l2 < self.finish_threshold) or (err_l2 > self.exceed_threshold)
-        return (self.get_reference_index(pose) == (len(self.path) - 1)) or (err_l2 > self.exceed_threshold) # and err_l2 < self.finish_threshold) or (err_l2 > self.exceed_threshold)
+        #return (self.get_reference_index(pose) == (len(self.path) - 1) and err_l2 < self.finish_threshold) or (err_l2 > self.exceed_threshold)
+        return (self.get_reference_index(pose) == (len(self.path) - 1)) or (err_l2 > self.exceed_threshold) # and (err_l2 < self.finish_threshold)  and err_l2 < self.finish_threshold) or (err_l2 > self.exceed_threshold)
 
     def get_reference_pose(self, index):
         '''
@@ -56,6 +56,10 @@ class BaseController(object):
             reference index.
         '''
         with self.path_lock:
+            if len(self.path) <= index:
+                rospy.logdebug('out of bound idx {} {}'.format(index, len(self.path)))
+                index = len(self.path) / 2 # hack 
+                return None
             assert len(self.path) > index
             return self.path[index]
 

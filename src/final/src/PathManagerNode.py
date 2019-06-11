@@ -3,7 +3,7 @@
 import Queue
 import rospy
 from std_srvs.srv import Empty, EmptyResponse
-from lab2.srv import FollowPath, GeneratePath
+from lab2.srv import FollowPath, GeneratePath, ReadFile, SignalPathComplete, StampedFollowPath
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Pose, PoseStamped
 from std_msgs.msg import Header, Float32
@@ -12,7 +12,11 @@ import dwave_networkx as dnx
 import networkx as nx
 import dimod
 import numpy as np
+import matplotlib.pyplot as plt
 import fitdubins
+import os
+import time
+
 class PathManagerNode(object):
     ''' Path-managing ROS node of running Racecar system
 
@@ -41,17 +45,18 @@ class PathManagerNode(object):
         pose_topic = rospy.get_param("/path_manager/pose_topic", "/sim_car_pose/pose")
         # waypoints_file = rospy.get_param("/path_manager/waypoints_file", "waypoints.txt")
         self.next_paths = None
-        self.headings = None
-        
         self.current_pose = None
-        
+        self.map = np.load('../../lab3/src/MapData.npy')
 
-        self.PathCompletedService = rospy.Service("/path_manager/path_complete", Empty, self.path_completed_cb)
+        self.PathCompletedService = rospy.Service("/path_manager/path_complete", SignalPathComplete, self.path_completed_cb)
         self.RunWaypointsService = rospy.Service("/path_manager/run_waypoints", ReadFile, self.waypoints_received)
         self.rp_waypoints = rospy.Publisher('xx_waypoints', Marker, queue_size=100)
         self.pose_sub = rospy.Subscriber(pose_topic, PoseStamped, self.get_current_pose)
         self.controller = rospy.ServiceProxy("/controller/follow_path", FollowPath)
         self.planner = rospy.ServiceProxy("/planner/generate_path", GeneratePath)
+        self.time_collect = time.time()
+        self.branch_path_complete = False
+
         rospy.spin()
 
     def run(self, poses):
@@ -61,19 +66,46 @@ class PathManagerNode(object):
         #   evaluate time budget
         #   call service to ROSPlannerFinal and retrieve a new path
         #   push new path to queue
-        if self.waypoints is None:
+        if poses is None:
             raise RuntimeError('No waypoints is read.')
 
         # initialize states
         self.next_paths = Queue.Queue()
 
+        # convert poses to ROS Pose and Marker
+        ros_poses = []
+        for i in range(len(poses)):
+            rpose = util.particle_to_pose(poses[i])
+            ros_poses.append(rpose)
+            marker = self.make_marker(rpose, i, "goalpoint")
+            self.rp_waypoints.publish(marker)
+        assert len(ros_poses) == len(poses)
+
         first_flag = True
-        for i in range(len(self.waypoints) - 1):
-            m = self.make_marker(self.waypoints[i], i, "goalpoint")
-            self.rp_waypoints.publish(m)
-            start = util.particle_to_pose(self.waypoints[i])
-            goal = util.particle_to_pose(self.waypoints[i+1])
-            path = self.planner(start, goal).path
+        sstart = 0
+        max_cnt = 5
+        for i in range(1, len(ros_poses)):
+            cnt = 1
+            print 'Computing path from point {} to point {}...'.format(sstart, i)
+            resp = self.planner(ros_poses[sstart], ros_poses[i])
+            while not resp.success and cnt <= max_cnt:
+                # perturb heading and keep runing
+                perturb_pose = poses[i]
+                perturb_pose[2] += cnt / max_cnt * (2 * np.pi)
+                #print 'check', ros_poses[i], perturb_pose
+
+                rpose = util.particle_to_pose(perturb_pose)
+                test_plantime = rospy.get_time()
+                resp = self.planner(ros_poses[sstart], rpose, False)
+                print rospy.get_time() - test_plantime
+                print 'Failed to find path.'
+                cnt += 1
+            if not resp.success:
+                print 'Failed to find path with all sampled headings.'
+                continue
+            print 'Path found.'
+            sstart = i
+            path = resp.path
             if first_flag:
                 first_flag = False
                 success = self.controller(path)
@@ -83,11 +115,15 @@ class PathManagerNode(object):
 
     def path_completed_cb(self, req):
         print "path completed"
-        print "Waiting for next path..."
-        next_path = self.next_paths.get(block=True, timeout=10)
-        print "Sending next path..."
-        success = self.controller(next_path)
-        print "Controller started.", success
+        print "Fetching next path..."
+        
+        try:
+            next_path = self.next_paths.get(block=True, timeout=30)
+            print "Sending next path..."
+            success = self.controller(next_path)
+            print "Controller started.", success
+        except Queue.Empty:
+            print "Fetching timeout."
         return EmptyResponse()
 
     def make_marker(self, config, i, point_type):
@@ -95,15 +131,13 @@ class PathManagerNode(object):
         marker.header = Header()
         marker.header.stamp = rospy.Time.now()
         marker.header.frame_id = "map"
-        marker.ns = str(config)
+        marker.ns = "waypoints"
         marker.id = i
-        marker.type = Marker.CUBE
-        marker.pose.position.x = config[0]
-        marker.pose.position.y = config[1]
-        marker.pose.orientation.w = 1
-        marker.scale.x = 0.1
-        marker.scale.y = 0.1
-        marker.scale.z = 0.1
+        marker.type = Marker.ARROW
+        marker.pose = config
+        marker.scale.x = 0.5
+        marker.scale.y = 0.05
+        marker.scale.z = 0.05
         marker.color.a = 1.0
         if point_type == "waypoint":
             marker.color.b = 1.0
@@ -115,16 +149,28 @@ class PathManagerNode(object):
 
     def get_current_pose(self, msg):
         self.current_pose = msg.pose
+        curr_pose = util.rospose_to_posetup(self.current_pose)
+        if time.time() - self.time_collect > 5 and raw_input('position ok?') == ' ':
+            with open(os.path.dirname(os.path.realpath(__file__)) + '/test_position.txt', 'a+') as f:
+                f.write('{} {} \n'.format(curr_pose[0], curr_pose[1]))
+            self.time_collect = time.time()
 
     def waypoints_received(self, req):
+        plt.subplot(111)
+        ax = plt.gca()
         req_waypoints, scores = _parse_waypoints(req.filename)
-        #
-        #waypoints = _get_roundtrip_waypoints(, req_waypoints)
-        #headings = fitdubins.fit_heading_spline(self.waypoints)
-        # headings[0] = fe
-        #self.run(np.c_[waypoints, headings])
+        curr_pose = util.rospose_to_posetup(self.current_pose)
+        waypoints = _get_roundtrip_waypoints((curr_pose[0], curr_pose[1]), req_waypoints)
+        headings = fitdubins.fit_heading_spline(waypoints, ax)
+        ax.plot(waypoints[:, 0], waypoints[:, 1], 'o')
+        headings[0] = curr_pose[2]
+        fitdubins.visualize_dubins(waypoints, headings, 1/1.6, ax)
+        plt.savefig('../plots/plan.png')
+        plt.clf()
+        self.run(np.c_[waypoints, headings])
 
-
+    def handle_collision(self):
+        pass
 
 def _parse_waypoints(filename):
     way_points, points = [], []
@@ -136,14 +182,6 @@ def _parse_waypoints(filename):
             points.append(pts)
             line = wf.readline()
     return way_points, points
-
-
-def _init_pose():
-    '''
-    try kidnap and click, decide which one to use.
-    '''
-    pass 
-
 
 def _get_roundtrip_waypoints(start, waypoints):
     ''' Returns the reordered waypoints in the intended traversing order.
@@ -177,6 +215,7 @@ def _get_roundtrip_waypoints(start, waypoints):
         tovisit.remove(nxt_point[1])
     ordered_waypoints.append(start)
     return np.array(ordered_waypoints)
+
 
 
 def _get_orientation(waypoints):

@@ -90,18 +90,19 @@ def visualize_dubins(waypoints, headings, turning_radius, ax, label='dubins'):
         p1 = (waypoints[i, 0], waypoints[i, 1], headings[i])
         p2 = (waypoints[i + 1, 0], waypoints[i + 1, 1], headings[i + 1])
         dpath = dubins.shortest_path(p1, p2, turning_radius)
-        points, _ = dpath.sample_many(0.1)
+        points, _ = dpath.sample_many(0.05)
         points = np.array(points)
         dubins_seg.append(points)
     dubins_path = np.concatenate(dubins_seg, axis=0)
     ax.plot(dubins_path[:, 0], dubins_path[:, 1], 'r', label=label)
+    return dubins_path
 
 
 def _run_example():
-    plt.figure(figsize=(6.5, 4))
+    plt.figure(Vfigsize=(6.5, 4))
     ax = plt.gca()
     waypoints = generate_waypoints(10, ax)
-    headings = fit_heading_spline(waypoints)
+    headings = fit_heading_spline(waypoints,ax)
     # headings = fit_heading_straight(waypoints)
     visualize_dubins(waypoints, headings, 1, ax)
     ax.set_aspect('equal')

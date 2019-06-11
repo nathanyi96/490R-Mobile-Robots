@@ -167,6 +167,8 @@ def world_to_map(poses, map_info):
     poses[:,1] = s*temp       + c*poses[:,1]
     poses[:,2] += angle
 
+    return poses
+
 
 def angle_to_rosquaternion(angle):
     """Convert an angle in radians into a quaternion _message_."""
@@ -187,3 +189,4 @@ def rospose_to_posetup(posemsg):
     y = posemsg.position.y
     th = rosquaternion_to_angle(posemsg.orientation)
     return x, y, th
+

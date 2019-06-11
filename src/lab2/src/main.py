@@ -9,7 +9,7 @@ if __name__ == '__main__':
 
     signal.signal(signal.SIGINT, node.shutdown)
 
-    controller = threading.Tread(start=node.start)
+    controller = threading.Thread(start=node.start)
     controller.start()
 
     while controller.run:

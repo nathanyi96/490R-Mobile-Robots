@@ -16,13 +16,15 @@ class NonLinearController(BaseController):
         # hack: check if there's a gap in reference index
         with self.path_lock:
             thre = 30
-            init_idx = max(self.prev_idx - thre, 0) 
-            dist = np.sqrt(np.sum(((self.path[:,0:2] - pose[0:2])**2), axis=1))
-            dist = np.sqrt(np.sum(((self.path[init_idx:init_idx+thre,0:2] - pose[0:2])**2), axis=1))
+            if self.prev_idx < 0:
+                init_idx = 0
+                dist = np.sqrt(np.sum(((self.path[:,0:2] - pose[0:2])**2), axis=1))
+            else:
+                init_idx = max(self.prev_idx - thre, 0) 
+                dist = np.sqrt(np.sum(((self.path[init_idx:init_idx+2 * thre,0:2] - pose[0:2])**2), axis=1))
             idx = np.argmin(dist) + init_idx 
-            rospy.loginfo('idx: {}'.format(idx))
-            self.prev_idx = (idx if (idx == len(self.path)-1) else idx+1)
-            return self.prev_idx
+            self.prev_idx = idx
+            return (len(self.path)-1 if (idx + 5 >= len(self.path)) else idx+5)
 
     def get_control(self, pose, index):
         pose_ref = self.get_reference_pose(index)
@@ -38,7 +40,6 @@ class NonLinearController(BaseController):
         y = -k_1 * e_ct * velocity * np.sin(theta_err) - k_2 * theta_err**2
         x = theta_err * velocity / self.B
         steering_angle = np.arctan(y/x) if abs(x) > 1e-8 else np.arctan(-k_1*e_ct*self.B)
-        rospy.loginfo('v:{}, delta:{}, theta_err: {}'.format(velocity, steering_angle, theta_err))
         steering_angle = np.clip(steering_angle, -0.34, 0.34) 
         return np.array([velocity, steering_angle])
 
@@ -51,5 +52,5 @@ class NonLinearController(BaseController):
         with self.path_lock:
             self.k1 = float(rospy.get_param("/lyapunov/k1", 5.0))
             self.k2 = float(rospy.get_param("/lyapunov/k2", 10.0))
-            self.finish_threshold = float(rospy.get_param("/lyapunov/finish_threshold", 0.2))
+            self.finish_threshold = float(rospy.get_param("/lyapunov/finish_threshold", 0.5))
             self.exceed_threshold = float(rospy.get_param("/lyapunov/exceed_threshold", 4.0))

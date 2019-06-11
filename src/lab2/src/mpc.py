@@ -193,7 +193,7 @@ class ModelPredictiveController(BaseController):
                 self.Tlong = self.T
                 self.Tshort = 3
                 self.TRAJLIB_THRES = 1.0
-            self.ENABLE_OBS_DIST = rospy.get_param("mpc/obs_dist", False)
+            self.ENABLE_OBS_DIST = rospy.get_param("mpc/obs_dist", True)
 
     def init_laser(self):
         self.EXCLUDE_MAX_RANGE_RAYS = True

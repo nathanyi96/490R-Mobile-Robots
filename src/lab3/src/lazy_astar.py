@@ -77,7 +77,7 @@ def astar_path(G, source, target, weight, heuristic=None, return_dist=False):
         # Implement here using astar.py as your reference.
         if curnode in explored:
             continue
-        if parent:  # not start node
+        if parent is not None:  # not start node
             validity, _ = weight(parent, curnode)
             if not validity:
                 continue
@@ -101,12 +101,11 @@ def astar_path(G, source, target, weight, heuristic=None, return_dist=False):
                 # neighbor to the source was already determined.
                 # Therefore, we won't attempt to push this neighbor
                 # to the queue
-                if qcost <= ncost:
-                    continue
+                # if qcost <= ncost:
+                #     continue
             else:
                 h = heuristic(neighbor, target)
 
             enqueued[neighbor] = ncost, h
             push(queue, (ncost + h, next(c), neighbor, ncost, curnode))
-
     raise nx.NetworkXNoPath("Node %s not reachable from %s" % (source, target))
