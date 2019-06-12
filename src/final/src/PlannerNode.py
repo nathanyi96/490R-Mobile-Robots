@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import numpy as np
 import matplotlib.pyplot as plt
 import util
@@ -22,8 +23,8 @@ class PlannerNode(object):
     def __init__(self, mainpoints_file):
         rospy.init_node('final_planner', anonymous=True)
         # parse main way points
-        self.CURVATURE = 0.06 #0.075
-        self.TRY_DISTANCE = 150
+        self.CURVATURE = 0.05 #0.075
+        self.TRY_DISTANCE = 50
         self.SAMPLED_HEADINGS = np.linspace(0, 2*np.pi, 16, endpoint=False)
         self.SPEED = 0.5
 
@@ -86,7 +87,7 @@ class PlannerNode(object):
         # start to main
         init_pose = self.curpose
         mnt_point_idx = np.argsort(np.linalg.norm(init_pose[:2] - self.main_path[:,:2], axis=-1))
-        for i in range(mnt_point_idx.shape[0]):
+        for i in range(50, mnt_point_idx.shape[0]):
             mnt_point = self.main_path[mnt_point_idx[i]]
             bridge, bridge_len = self.try_dubins(init_pose, mnt_point, headings=np.linspace(-0.3, 0.3, 7, endpoint=True)+mnt_point[2])
             if bridge is not None:

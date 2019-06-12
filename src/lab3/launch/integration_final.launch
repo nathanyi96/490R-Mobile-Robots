@@ -1,6 +1,6 @@
 <launch>
   	<arg name="controller" default="NL" />
-    <include file="$(find lab3)/launch/map_server.launch" />
+    <include file="$(find lab3)/launch/map_server_final.launch" />
     <param name="/controller/type" value="$(arg controller)" />
     <node pkg="lab2" name="controller" type="main_final.py" />
 </launch>

@@ -1,6 +1,5 @@
 geometry_msgs/Pose start
 geometry_msgs/Pose goal
-bool backward
 ---
 lab2/XYHVPath path
 bool success

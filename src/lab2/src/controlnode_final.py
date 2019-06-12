@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import rospy
 import threading
 
@@ -142,7 +143,7 @@ class ControlNode:
         exit(0)
 
     def load_controller(self):
-        self.controller_type = rospy.get_param("/controller/type", default="PP")
+        self.controller_type = rospy.get_param("/controller/type", default="NL")
         self.controller = controllers[self.controller_type]()
 
     def setup_pub_sub(self):

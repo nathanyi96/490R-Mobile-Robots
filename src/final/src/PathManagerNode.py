@@ -3,14 +3,12 @@
 import Queue
 import rospy
 from std_srvs.srv import Empty, EmptyResponse
-from lab2.srv import FollowPath, GeneratePath, ReadFile, SignalPathComplete, StampedFollowPath
+from lab2.srv import FollowPath, GeneratePath, ReadFile, ReadFileResponse, SignalPathComplete, StampedFollowPath
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Pose, PoseStamped
 from std_msgs.msg import Header, Float32
 import util
-import dwave_networkx as dnx
 import networkx as nx
-import dimod
 import numpy as np
 import matplotlib.pyplot as plt
 import fitdubins
@@ -46,16 +44,17 @@ class PathManagerNode(object):
         # waypoints_file = rospy.get_param("/path_manager/waypoints_file", "waypoints.txt")
         self.next_paths = None
         self.current_pose = None
-        self.map = np.load('../../lab3/src/MapData.npy')
+        #self.map = np.load('../../lab3/src/MapData.npy')
 
-        self.PathCompletedService = rospy.Service("/path_manager/path_complete", SignalPathComplete, self.path_completed_cb)
+        self.PathCompletedService = rospy.Service("/path_manager/path_complete", Empty, self.path_completed_cb)
         self.RunWaypointsService = rospy.Service("/path_manager/run_waypoints", ReadFile, self.waypoints_received)
         self.rp_waypoints = rospy.Publisher('xx_waypoints', Marker, queue_size=100)
         self.pose_sub = rospy.Subscriber(pose_topic, PoseStamped, self.get_current_pose)
         self.controller = rospy.ServiceProxy("/controller/follow_path", FollowPath)
         self.planner = rospy.ServiceProxy("/planner/generate_path", GeneratePath)
-        self.time_collect = time.time()
-        self.branch_path_complete = False
+        #self.time_collect = time.time()
+        #self.branch_path_complete = False
+        rospy.wait_for_message(pose_topic, PoseStamped)
 
         rospy.spin()
 
@@ -96,7 +95,7 @@ class PathManagerNode(object):
 
                 rpose = util.particle_to_pose(perturb_pose)
                 test_plantime = rospy.get_time()
-                resp = self.planner(ros_poses[sstart], rpose, False)
+                resp = self.planner(ros_poses[sstart], rpose)
                 print rospy.get_time() - test_plantime
                 print 'Failed to find path.'
                 cnt += 1
@@ -149,11 +148,11 @@ class PathManagerNode(object):
 
     def get_current_pose(self, msg):
         self.current_pose = msg.pose
-        curr_pose = util.rospose_to_posetup(self.current_pose)
-        if time.time() - self.time_collect > 5 and raw_input('position ok?') == ' ':
-            with open(os.path.dirname(os.path.realpath(__file__)) + '/test_position.txt', 'a+') as f:
-                f.write('{} {} \n'.format(curr_pose[0], curr_pose[1]))
-            self.time_collect = time.time()
+    #    curr_pose = util.rospose_to_posetup(self.current_pose)
+    #    if time.time() - self.time_collect > 5 and raw_input('position ok?') == ' ':
+    #        with open(os.path.dirname(os.path.realpath(__file__)) + '/test_position.txt', 'a+') as f:
+    #            f.write('{} {} \n'.format(curr_pose[0], curr_pose[1]))
+    #        self.time_collect = time.time()
 
     def waypoints_received(self, req):
         plt.subplot(111)
@@ -164,13 +163,12 @@ class PathManagerNode(object):
         headings = fitdubins.fit_heading_spline(waypoints, ax)
         ax.plot(waypoints[:, 0], waypoints[:, 1], 'o')
         headings[0] = curr_pose[2]
-        fitdubins.visualize_dubins(waypoints, headings, 1/1.6, ax)
+        # fitdubins.visualize_dubins(waypoints, headings, 1/1.6, ax)
         plt.savefig('../plots/plan.png')
         plt.clf()
         self.run(np.c_[waypoints, headings])
+        return ReadFileResponse()
 
-    def handle_collision(self):
-        pass
 
 def _parse_waypoints(filename):
     way_points, points = [], []

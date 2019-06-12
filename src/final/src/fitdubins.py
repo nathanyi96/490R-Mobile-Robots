@@ -51,6 +51,24 @@ def fit_heading_spline(points, ax=None):
     dxys = spline(points_ts, 1)
     return np.arctan2(dxys[:, 1], dxys[:, 0])
 
+def fit_spline(points, ax=None):
+    """
+    """
+    seg_dist = np.linalg.norm(np.diff(points, axis=0), axis=1)
+    points_ts = np.empty(points.shape[0])
+    np.cumsum(seg_dist, out=points_ts[1:])
+    points_ts[0] = 0.0
+    points_ts /= (points_ts[-1] / (points.shape[0]))
+    # points_ts = np.arange(points.shape[0], dtype=np.float)
+    spline = CubicSpline(points_ts, points, bc_type='periodic')
+    ts = np.linspace(0, points.shape[0], 500)
+    sppts = spline(ts)
+    if ax is not None:
+        ax.plot(sppts[:, 0], sppts[:, 1], label='spline', color="green")
+    dxys = spline(ts, 1)
+    headings = np.arctan2(dxys[:, 1], dxys[:, 0])
+    return np.c_[sppts, headings]
+
 
 def fit_heading_random(points):
     """
@@ -76,7 +94,7 @@ def fit_heading_straight(points):
     return headings
 
 
-def visualize_dubins(waypoints, headings, turning_radius, ax, label='dubins'):
+def visualize_dubins(waypoints, headings, turning_radius, ax=None, label='dubins'):
     """
     Plot Dubins curves that traverse a list of poses in order.
     :param waypoints: n x 2 ndarray representing the locations, with the first and last entry being identical
@@ -94,7 +112,8 @@ def visualize_dubins(waypoints, headings, turning_radius, ax, label='dubins'):
         points = np.array(points)
         dubins_seg.append(points)
     dubins_path = np.concatenate(dubins_seg, axis=0)
-    ax.plot(dubins_path[:, 0], dubins_path[:, 1], 'r', label=label)
+    if ax is not None:
+        ax.plot(dubins_path[:, 0], dubins_path[:, 1], 'r', label=label)
     return dubins_path
 
 

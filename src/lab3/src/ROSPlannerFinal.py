@@ -27,7 +27,7 @@ import IPython
 class ROSPlanner:
 
     def __init__(self, heuristic_func, weight_func, num_vertices, connection_radius,
-        graph_file='ros_graph.pkl', do_shortcut=False, num_goals=1,
+        graph_file='ros_graph_lab.pkl', do_shortcut=False, num_goals=1,
         curvature=0.02, plan_time=2, plan_with_budget=False):
         """
         @param heuristic_func: Heuristic function to be used in lazy_astar
@@ -110,8 +110,8 @@ class ROSPlanner:
        #  print 'time left', self.time_left
         return time.time()
     
-    def gen_path(self, req):
-        return self.plan_to_goal(req)
+   # def gen_path(self, req):
+   #     return self.plan_to_goal(req)
 
     def gen_path(self, req):
         """
@@ -127,7 +127,7 @@ class ROSPlanner:
         map_points = self.plan_to_goal(start, goal)
         if map_points is not None and len(map_points) > 0:
             world_points = self.map2world(map_points)
-            path = self.toXYHVPath(world_points, req.backward)
+            path = self.toXYHVPath(world_points)
             return GeneratePathResponse(path, True)
         else:
             return GeneratePathResponse(None, False)
@@ -223,10 +223,10 @@ class ROSPlanner:
         # added_nodes = vertices
         return added_nodes, ellipse, start_time
 
-    def toXYHVPath(self, waypoints, backward=False):
+    def toXYHVPath(self, waypoints):
         h = Header()
         h.stamp = rospy.Time.now()
-        desired_speed = 1.0
+        desired_speed = 0.5
 
         speeds = np.zeros(len(waypoints))
         speeds[:] = desired_speed
@@ -348,7 +348,7 @@ if __name__ == '__main__':
     num_goals = int(rospy.get_param("planner/goals", 1))
     heuristic = lambda n1, n2, env, G: env.compute_heuristic(n1, n2)
     weight = lambda n1, n2, env, G: env.edge_validity_checker(n1, n2)
-    ROSPlanner(heuristic, weight, num_vertices=300, connection_radius=200, do_shortcut=do_shortcut, num_goals=num_goals, 
-            plan_time=0.5, plan_with_budget=False, curvature=0.075) # 250 500
+    ROSPlanner(heuristic, weight, num_vertices=1000, connection_radius=200, do_shortcut=do_shortcut, num_goals=num_goals, 
+            plan_time=0.5, plan_with_budget=False, curvature=0.03) # 250 500
     
 

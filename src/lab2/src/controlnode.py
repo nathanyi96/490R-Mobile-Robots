@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import rospy
 import threading
 
@@ -6,10 +7,11 @@ import os
 from ackermann_msgs.msg import AckermannDriveStamped
 from geometry_msgs.msg import PoseStamped, PoseArray, Pose, PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry
+from std_msgs.msg import Empty
 from std_msgs.msg import Header, Float32
 from std_srvs.srv import Empty as SrvEmpty
 from lab2.msg import XYHVPath, XYHVPath_log
-from lab2.srv import FollowPath, FollowPath_log, StampedFollowPath
+from lab2.srv import FollowPath, FollowPath_log
 from visualization_msgs.msg import Marker
 
 import csv
@@ -25,7 +27,7 @@ controllers = {
     "PP": purepursuit.PurePursuitController,
     "NL": nonlinear.NonLinearController,
     "MPC": mpc.ModelPredictiveController,
-    "MPC2": mpc2.ModelPredictiveControllerNaive,
+    "MPC2": mpc2.ModelPredictiveControllerNaive
 }
 
 class AverageMeter(object):
@@ -107,11 +109,9 @@ class ControlNode:
         rate = rospy.Rate(50) # 50 in sim, 8 in real with PF
         self.inferred_pose = None
         print "Control Node Initialized"
-        rospy.loginfo('start')
         while not rospy.is_shutdown():
             self.path_event.wait()
             self.reset_lock.acquire()
-            rospy.loginfo('run')
             ip = self.inferred_pose
             if ip is not None and self.controller.ready():
                 index = self.controller.get_reference_index(ip)
@@ -128,7 +128,6 @@ class ControlNode:
                     # self.log_error()
                     self.path_event.clear()
                     self.notifyComplete()
-                    # call manager/complete service
             self.reset_lock.release()
             rate.sleep()
 
@@ -146,9 +145,7 @@ class ControlNode:
         rospy.Service("~reset/hard", SrvEmpty, self.srv_reset_hard)
         rospy.Service("~reset/state", SrvEmpty,  self.srv_reset_state)
         rospy.Service("~reset/params", SrvEmpty, self.srv_reset_params)
-
-        rospy.Subscriber("/initialpose",
-                PoseWithCovarianceStamped, self.cb_init_pose, queue_size=1)
+        self.notifyComplete = rospy.ServiceProxy("/path_manager/path_complete", SrvEmpty)
         rospy.Subscriber("/controller/set_path",
                  XYHVPath, self.cb_path, queue_size=1)
         # rospy.Subscriber("/controller/set_path",
@@ -156,7 +153,7 @@ class ControlNode:
         rospy.Service("/controller/follow_path", FollowPath, self.cb_path)
         #rospy.Service("/controller/follow_path_log", FollowPath_log, self.cb_path_log)
 
-        self.notifyComplete = rospy.ServiceProxy("path_manager/path_complete", SrvEmpty)
+        rospy.Subscriber("/initialpose", PoseWithCovarianceStamped, self.cb_init_pose, queue_size=1)
 
         rospy.Subscriber(rospy.get_param("~pose_topic", "/sim_car_pose/pose"),
                              PoseStamped, self.cb_pose, queue_size=10)
@@ -238,10 +235,8 @@ class ControlNode:
         self.inferred_pose = utils.rospose_to_posetup(msg.pose.pose)
 
     def cb_path(self, msg):
-
         rospy.loginfo("Got path!")
         path = msg.path.waypoints
-        print("path", path)
         self.visualize_path(path)
         self.controller.set_path(path)
         self.path_event.set()
@@ -251,7 +246,6 @@ class ControlNode:
     def cb_path_log(self, msg):
         rospy.loginfo("Got path!!")
         path = msg.path.waypoints
-        rospy.loginfo('path'+str(path))
         self.path_name = msg.path_name
         rospy.loginfo(self.path_name)
         self.visualize_path(path)
@@ -331,5 +325,4 @@ class ControlNode:
 
     def cb_init_pose(self, pose):
         # self.initialpose = utils.rospose_to_posetup_(pose)
-        self.path_event.clear()
         self.path_event.set()

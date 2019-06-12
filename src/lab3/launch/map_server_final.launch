@@ -1,0 +1,4 @@
+<launch>
+    <node pkg="map_server" name="map_server" type="map_server" args="$(find lab3)/maps/gates_commons.yaml" ns="/obs"/>
+    <node pkg="map_server" name="map_server" type="map_server" args="$(find lab3)/maps/gates_commons.yaml"/>
+</launch>
